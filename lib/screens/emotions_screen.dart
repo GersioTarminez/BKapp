@@ -7,7 +7,7 @@ import '../services/storage_service.dart';
 import '../widgets/avatar_preview.dart';
 
 class EmotionsScreen extends StatefulWidget {
-  const EmotionsScreen({super.key});
+  const EmotionsScreen({Key? key}) : super(key: key);
 
   @override
   State<EmotionsScreen> createState() => _EmotionsScreenState();
