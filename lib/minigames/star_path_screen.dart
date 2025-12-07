@@ -115,6 +115,11 @@ class _StarPathScreenState extends State<StarPathScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
+          image: DecorationImage(
+            image: AssetImage('assets/images/star_bg.png'),
+            repeat: ImageRepeat.repeat,
+            opacity: 0.15,
+          ),
         ),
         child: Column(
           children: [

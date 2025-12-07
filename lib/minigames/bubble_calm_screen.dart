@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:math';
-
 import 'package:flutter/material.dart';
+
+import '../services/sound_service.dart';
+import 'bubble_calm_controller.dart';
 
 class BubbleCalmScreen extends StatefulWidget {
   const BubbleCalmScreen({super.key});
@@ -11,73 +12,14 @@ class BubbleCalmScreen extends StatefulWidget {
 }
 
 class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
-  final List<_Burbuja> _burbujas = [];
-  final Random _random = Random();
+  final BubbleCalmController _controller = BubbleCalmController();
   Timer? _timer;
-  Size _screenSize = Size.zero;
-  int _contadorBurbujas = 0;
 
   @override
   void initState() {
     super.initState();
-    _crearBurbujas();
     _timer = Timer.periodic(const Duration(milliseconds: 30), (_) {
-      _actualizarBurbujas();
-    });
-  }
-
-  void _crearBurbujas() {
-    for (var i = 0; i < 14; i++) {
-      _burbujas.add(
-        _Burbuja(
-          x: 0,
-          y: 0,
-          size: 40 + _random.nextDouble() * 30,
-          speed: 0.8 + _random.nextDouble() * 1.4,
-        ),
-      );
-    }
-  }
-
-  void _actualizarBurbujas() {
-    if (_screenSize == Size.zero) return;
-    setState(() {
-      for (final burbuja in _burbujas) {
-        if (burbuja.estaExplotando) {
-          burbuja.avanceExplosion += 0.05;
-          if (burbuja.avanceExplosion >= 1) {
-            _reiniciarBurbuja(burbuja);
-          }
-          continue;
-        }
-
-        burbuja.y -= burbuja.speed;
-        if (burbuja.y + burbuja.size < 0) {
-          _reiniciarBurbuja(burbuja);
-        }
-      }
-    });
-  }
-
-  void _reiniciarBurbuja(_Burbuja burbuja) {
-    burbuja
-      ..size = 40 + _random.nextDouble() * 40
-      ..speed = 0.8 + _random.nextDouble() * 1.6
-      ..x = _random.nextDouble() *
-          max(0, _screenSize.width - burbuja.size - 16) +
-          8
-      ..y = _screenSize.height + _random.nextDouble() * 200
-      ..estaExplotando = false
-      ..avanceExplosion = 0;
-  }
-
-  void _explotarBurbuja(_Burbuja burbuja) {
-    if (burbuja.estaExplotando) return;
-    setState(() {
-      _contadorBurbujas++;
-      burbuja
-        ..estaExplotando = true
-        ..avanceExplosion = 0;
+      setState(_controller.tick);
     });
   }
 
@@ -89,14 +31,8 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _screenSize = MediaQuery.of(context).size;
-    if (_burbujas.any((burbuja) => burbuja.y == 0 && burbuja.x == 0)) {
-      for (final burbuja in _burbujas) {
-        if (burbuja.x == 0 && burbuja.y == 0) {
-          _reiniciarBurbuja(burbuja);
-        }
-      }
-    }
+    final screenSize = MediaQuery.of(context).size;
+    _controller.updateScreenSize(screenSize);
 
     return Scaffold(
       appBar: AppBar(
@@ -105,42 +41,56 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
         foregroundColor: Colors.white,
       ),
       body: Container(
-        color: const Color(0xFFBFD7FF),
+        decoration: const BoxDecoration(
+          color: Color(0xFFBFD7FF),
+          image: DecorationImage(
+            image: AssetImage('assets/images/bubble_bg.png'),
+            repeat: ImageRepeat.repeat,
+            opacity: 0.35,
+          ),
+        ),
         child: Stack(
           children: [
             Positioned(
-              top: 30,
+              top: 26,
               left: 20,
+              right: 20,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.white.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(24),
                 ),
-                child: Text(
-                  'Burbujas explotadas: $_contadorBurbujas',
-                  style: const TextStyle(
-                    color: Color(0xFF4A6FA5),
+                child: const Text(
+                  'Respira hondo y deja que las burbujas suban lentas como tus pensamientos.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF35527D),
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
-            ..._burbujas.map((burbuja) {
+            ..._controller.bubbles.map((burbuja) {
               return Positioned(
                 left: burbuja.x,
                 top: burbuja.y,
                 child: GestureDetector(
-                  onTap: () => _explotarBurbuja(burbuja),
+                  onTap: () {
+                    setState(() {
+                      _controller.explode(burbuja);
+                      SoundService.instance.playBubblePop();
+                    });
+                  },
                   child: Opacity(
-                    opacity: burbuja.estaExplotando
-                        ? max(0, 1 - burbuja.avanceExplosion)
+                    opacity: burbuja.isExploding
+                        ? (1 - burbuja.explosionProgress).clamp(0.0, 1.0)
                         : 1,
                     child: Transform.scale(
-                      scale: burbuja.estaExplotando
-                          ? 1 + burbuja.avanceExplosion * 0.3
+                      scale: burbuja.isExploding
+                          ? 1 + burbuja.explosionProgress * 0.3
                           : 1,
                       child: Container(
                         width: burbuja.size,
@@ -183,20 +133,4 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
       ),
     );
   }
-}
-
-class _Burbuja {
-  _Burbuja({
-    required this.x,
-    required this.y,
-    required this.size,
-    required this.speed,
-  });
-
-  double x;
-  double y;
-  double size;
-  double speed;
-  bool estaExplotando = false;
-  double avanceExplosion = 0;
 }

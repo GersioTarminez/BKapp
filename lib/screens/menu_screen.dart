@@ -5,6 +5,7 @@ import '../minigames/seed_garden_screen.dart';
 import '../minigames/star_path_screen.dart';
 import 'avatar_screen.dart';
 import 'emotions_screen.dart';
+import 'settings_screen.dart';
 
 class MenuScreen extends StatelessWidget {
   const MenuScreen({super.key});
@@ -36,6 +37,11 @@ class MenuScreen extends StatelessWidget {
         title: 'Create My Avatar',
         subtitle: 'Design a calm friend',
         builder: () => const AvatarScreen(),
+      ),
+      _MenuItem(
+        title: 'Calm Settings',
+        subtitle: 'Info & soft preferences',
+        builder: () => const SettingsScreen(),
       ),
     ];
 

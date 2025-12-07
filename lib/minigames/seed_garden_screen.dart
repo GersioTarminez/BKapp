@@ -3,6 +3,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../models/garden_plant.dart';
+import '../services/garden_storage_service.dart';
+
 class SeedGardenScreen extends StatefulWidget {
   const SeedGardenScreen({super.key});
 
@@ -16,30 +19,23 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   final List<_Flower> _flowers = [];
   final Random _random = Random();
   final GlobalKey _gardenKey = GlobalKey();
+  static const List<String> _calmTreeTypes = ['Green', 'Blue', 'Yellow', 'Red', 'White'];
+  final GardenStorageService _gardenStorage = GardenStorageService();
   _VegetationMode _mode = _VegetationMode.tree;
   _WeatherType _weather = _WeatherType.sunny;
-
-  static final List<_ForestGoal> _goalOptions = [
-    _ForestGoal(label: 'Red', colors: ['Red']),
-    _ForestGoal(label: 'Green', colors: ['Green']),
-    _ForestGoal(label: 'Blue', colors: ['Blue']),
-    _ForestGoal(label: 'Yellow', colors: ['Yellow']),
-    _ForestGoal(label: 'White', colors: ['White']),
-  ];
-
-  late _ForestGoal _selectedGoal;
   late _GardenMap _gardenMap;
   late final AnimationController _animalController;
+  final List<GardenPlant> _pendingPlants = [];
 
   Timer? _growthTimer;
+  Timer? _saveDebounce;
   int _counter = 0;
-  double _scorePercent = 0;
-  String _scoreMessage = 'Tap anywhere to grow your calm forest.';
+  String _calmMessage = 'Tap anywhere to grow your calm forest.';
+  Size _gardenSize = Size.zero;
 
   @override
   void initState() {
     super.initState();
-    _selectedGoal = _goalOptions[1];
     _gardenMap = _generateMap();
     _animalController = AnimationController(
       vsync: this,
@@ -51,6 +47,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
     _growthTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
       _updateGrowth();
     });
+    _loadGarden();
   }
 
   _GardenMap _generateMap() {
@@ -146,22 +143,57 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
     return animals;
   }
 
+  Future<void> _loadGarden() async {
+    final saved = await _gardenStorage.loadGarden();
+    if (!mounted) return;
+    _pendingPlants
+      ..clear()
+      ..addAll(saved);
+    _restoreGardenFromPlants();
+  }
+
+  void _updateGardenSize(Size newSize) {
+    if (newSize == Size.zero || newSize == _gardenSize) {
+      return;
+    }
+    _gardenSize = newSize;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _restoreGardenFromPlants();
+    });
+  }
+
+  void _restoreGardenFromPlants() {
+    if (_pendingPlants.isEmpty || _gardenSize == Size.zero) {
+      return;
+    }
+    final restoredTrees = _pendingPlants.map(_treeFromPlant).toList();
+    setState(() {
+      _trees
+        ..clear()
+        ..addAll(restoredTrees);
+      _refreshCalmMessage();
+    });
+    _pendingPlants.clear();
+  }
+
   void _updateGrowth() {
     if (_trees.isEmpty) return;
+    var updated = false;
     setState(() {
       for (final tree in _trees) {
         if (tree.growth >= 1) continue;
         tree.growth = (tree.growth + 0.03 + _random.nextDouble() * 0.02)
             .clamp(0.0, 1.0);
+        updated = true;
+      }
+      if (updated) {
+        _refreshCalmMessage();
       }
     });
-  }
-
-  void _onSelectGoal(_ForestGoal goal) {
-    setState(() {
-      _selectedGoal = goal;
-      _recalculateScore();
-    });
+    if (updated) {
+      _scheduleSave();
+    }
   }
 
   void _handleTap(TapDownDetails details) {
@@ -195,7 +227,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   }
 
   void _createTree(Offset position) {
-    final treeType = _selectedGoal.colors.first;
+    final treeType = _calmTreeTypes[_random.nextInt(_calmTreeTypes.length)];
     final style = _TreeStyle.forType(treeType);
 
     setState(() {
@@ -210,8 +242,9 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
           growth: 0,
         ),
       );
-      _recalculateScore();
+      _refreshCalmMessage();
     });
+    _scheduleSave();
   }
 
   void _createFlower(Offset position) {
@@ -231,43 +264,173 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
           color: colors[_random.nextInt(colors.length)],
         ),
       );
+      _refreshCalmMessage();
     });
   }
 
-  void _recalculateScore() {
+  void _refreshCalmMessage() {
     if (_trees.isEmpty) {
-      _scorePercent = 0;
-      _scoreMessage = 'Tap anywhere to grow your calm forest.';
+      _calmMessage = 'Tap anywhere to grow your calm forest.';
       return;
     }
+    final counts = _stageCounts();
+    final seeds = counts['seeds']!;
+    final sprouts = counts['sprouts']!;
+    final grown = counts['grown']!;
+    final flowers = _flowers.length;
 
-    final matches = _trees
-        .where((tree) => tree.colorType == _selectedGoal.colors.first)
-        .length;
-    final percent = matches / _trees.length * 100;
-    _scorePercent = percent;
-
-    final goalLabel = _selectedGoal.label;
-    if (percent >= 70) {
-      _scoreMessage = 'Your $goalLabel forest is growing beautifully!';
-    } else if (percent >= 35) {
-      _scoreMessage =
-          'Lovely! Many of your trees match your $goalLabel goal.';
-    } else {
-      _scoreMessage =
-          'Your forest feels colorful and warm. Great job keeping it $goalLabel!';
+    final parts = <String>[];
+    if (grown > 0) {
+      parts.add('$grown calm tree${grown == 1 ? '' : 's'} watching over the garden');
     }
+    if (sprouts > 0) {
+      parts.add('$sprouts sprout${sprouts == 1 ? '' : 's'} stretching quietly');
+    }
+    if (seeds > 0) {
+      parts.add('$seeds seed${seeds == 1 ? '' : 's'} resting in the soil');
+    }
+    var message = parts.join(', ');
+    if (flowers > 0) {
+      message += message.isEmpty
+          ? '$flowers flower${flowers == 1 ? '' : 's'} smiling nearby.'
+          : '. $flowers flower${flowers == 1 ? '' : 's'} smiling nearby.';
+    }
+    _calmMessage = message.isEmpty
+        ? 'Your garden is quiet and waiting for new life.'
+        : '$message.';
+  }
+
+  Map<String, int> _stageCounts() {
+    final counts = {'seeds': 0, 'sprouts': 0, 'grown': 0};
+    for (final tree in _trees) {
+      if (tree.growth < 1 / 3) {
+        counts['seeds'] = counts['seeds']! + 1;
+      } else if (tree.growth < 2 / 3) {
+        counts['sprouts'] = counts['sprouts']! + 1;
+      } else {
+        counts['grown'] = counts['grown']! + 1;
+      }
+    }
+    return counts;
+  }
+
+  GardenPlant _plantFromTree(_Tree tree) {
+    final relative = _relativeFromAbsolute(tree.position);
+    final stage = (tree.growth * GardenPlant.maxStage)
+        .round()
+        .clamp(0, GardenPlant.maxStage) as int;
+    return GardenPlant(
+      id: tree.id,
+      emotion: _emotionForTreeType(tree.colorType),
+      position: relative,
+      stage: stage,
+      progress: tree.growth,
+      lastCare: DateTime.now(),
+    );
+  }
+
+  _Tree _treeFromPlant(GardenPlant plant) {
+    final type = _treeTypeForEmotion(plant.emotion);
+    final style = _TreeStyle.forType(type);
+    final position = _clampToGarden(
+      _absoluteFromRelative(plant.position),
+    );
+    final growth = plant.progress.clamp(0.0, 1.0);
+    return _Tree(
+      id: plant.id,
+      position: position,
+      colorType: type,
+      leafColor: style.leafColor,
+      seedColor: style.seedColor,
+      accentColor: style.accentColor,
+      growth: growth,
+    );
+  }
+
+  Offset _relativeFromAbsolute(Offset absolute) {
+    if (_gardenSize == Size.zero) {
+      return const Offset(0.5, 0.7);
+    }
+    final dx = (absolute.dx / _gardenSize.width).clamp(0.0, 1.0);
+    final dy = (absolute.dy / _gardenSize.height).clamp(0.0, 1.0);
+    return Offset(dx, dy);
+  }
+
+  Offset _absoluteFromRelative(Offset relative) {
+    if (_gardenSize == Size.zero) {
+      return Offset(relative.dx * 300, relative.dy * 300);
+    }
+    return Offset(
+      relative.dx * _gardenSize.width,
+      relative.dy * _gardenSize.height,
+    );
+  }
+
+  Offset _clampToGarden(Offset position) {
+    if (_gardenSize == Size.zero) return position;
+    final dx = position.dx.clamp(45.0, max(45.0, _gardenSize.width - 45.0));
+    final dy =
+        position.dy.clamp(130.0, max(130.0, _gardenSize.height - 10.0));
+    return Offset(dx.toDouble(), dy.toDouble());
+  }
+
+  SeedEmotion _emotionForTreeType(String type) {
+    switch (type) {
+      case 'Yellow':
+        return SeedEmotion.happy;
+      case 'Blue':
+        return SeedEmotion.sad;
+      case 'Red':
+        return SeedEmotion.brave;
+      case 'White':
+        return SeedEmotion.kind;
+      case 'Green':
+      default:
+        return SeedEmotion.calm;
+    }
+  }
+
+  String _treeTypeForEmotion(SeedEmotion emotion) {
+    switch (emotion) {
+      case SeedEmotion.happy:
+        return 'Yellow';
+      case SeedEmotion.sad:
+        return 'Blue';
+      case SeedEmotion.brave:
+        return 'Red';
+      case SeedEmotion.kind:
+        return 'White';
+      case SeedEmotion.calm:
+      default:
+        return 'Green';
+    }
+  }
+
+  void _scheduleSave() {
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(seconds: 1), () {
+      unawaited(_persistGarden());
+    });
+  }
+
+  Future<void> _persistGarden() async {
+    if (_gardenSize == Size.zero) return;
+    final plants = _trees.map(_plantFromTree).toList();
+    await _gardenStorage.saveGarden(plants);
   }
 
   @override
   void dispose() {
     _growthTimer?.cancel();
+    _saveDebounce?.cancel();
+    unawaited(_persistGarden());
     _animalController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final stageCounts = _stageCounts();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Seed Garden'),
@@ -276,11 +439,6 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       ),
       body: Column(
         children: [
-          _GoalSelector(
-            options: _goalOptions,
-            selectedGoal: _selectedGoal,
-            onSelect: _onSelectGoal,
-          ),
           _ModeSelector(
             mode: _mode,
             onModeChanged: (mode) {
@@ -297,139 +455,80 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTapDown: _handleTap,
-              child: SizedBox.expand(
-                key: _gardenKey,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _GardenPainter(
-                          map: _gardenMap,
-                          animalPhase: _animalController.value * 2 * pi,
-                          weather: _weather,
-                        ),
-                      ),
-                    ),
-                    ..._trees.map((tree) {
-                      return Positioned(
-                        left: tree.position.dx - 45,
-                        top: tree.position.dy - 130,
-                        child: SizedBox(
-                          width: 90,
-                          height: 140,
-                          child: _TreeGraphic(tree: tree),
-                        ),
-                      );
-                    }).toList(),
-                    ..._flowers.map((flower) {
-                      return Positioned(
-                        left: flower.position.dx - 10,
-                        top: flower.position.dy - 10,
-                        child: TweenAnimationBuilder<double>(
-                          key: ValueKey(flower.id),
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          duration: const Duration(milliseconds: 400),
-                          builder: (context, value, child) {
-                            return Opacity(
-                              opacity: value,
-                              child: Transform.scale(
-                                scale: value,
-                                child: child,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _updateGardenSize(Size(constraints.maxWidth, constraints.maxHeight));
+                  return SizedBox(
+                    key: _gardenKey,
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: const BoxDecoration(
+                              image: DecorationImage(
+                                image: AssetImage('assets/images/garden_bg.png'),
+                                repeat: ImageRepeat.repeat,
+                                opacity: 0.2,
                               ),
-                            );
-                          },
-                          child: _FlowerDot(color: flower.color),
+                            ),
+                          ),
                         ),
-                      );
-                    }).toList(),
-                  ],
-                ),
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _GardenPainter(
+                              map: _gardenMap,
+                              animalPhase: _animalController.value * 2 * pi,
+                              weather: _weather,
+                            ),
+                          ),
+                        ),
+                        ..._trees.map((tree) {
+                          return Positioned(
+                            left: tree.position.dx - 45,
+                            top: tree.position.dy - 130,
+                            child: SizedBox(
+                              width: 90,
+                              height: 140,
+                              child: _TreeGraphic(tree: tree),
+                            ),
+                          );
+                        }).toList(),
+                        ..._flowers.map((flower) {
+                          return Positioned(
+                            left: flower.position.dx - 10,
+                            top: flower.position.dy - 10,
+                            child: TweenAnimationBuilder<double>(
+                              key: ValueKey(flower.id),
+                              tween: Tween(begin: 0.0, end: 1.0),
+                              duration: const Duration(milliseconds: 400),
+                              builder: (context, value, child) {
+                                return Opacity(
+                                  opacity: value,
+                                  child: Transform.scale(
+                                    scale: value,
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: _FlowerDot(color: flower.color),
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ),
-          _ScorePanel(
-            goalLabel: _selectedGoal.label,
-            goalColor: _selectedGoal.colors.first,
-            percent: _scorePercent,
-            message: _scoreMessage,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GoalSelector extends StatelessWidget {
-  const _GoalSelector({
-    required this.options,
-    required this.selectedGoal,
-    required this.onSelect,
-  });
-
-  final List<_ForestGoal> options;
-  final _ForestGoal selectedGoal;
-  final ValueChanged<_ForestGoal> onSelect;
-
-  static final Map<String, Color> _goalColors = {
-    'Red': const Color(0xFFF8B6B8),
-    'Green': const Color(0xFFB7E4C7),
-    'Blue': const Color(0xFFAED9FF),
-    'Yellow': const Color(0xFFFFE59D),
-    'White': const Color(0xFFE8ECF4),
-  };
-
-  Color _chipColor(_ForestGoal goal) {
-    if (goal.colors.length == 1) {
-      return _goalColors[goal.colors.first] ?? const Color(0xFFDCE7F9);
-    }
-    final first = goal.colors.first;
-    return (_goalColors[first] ?? const Color(0xFFDCE7F9)).withOpacity(0.8);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: Colors.white.withOpacity(0.72),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'What kind of forest do you want?',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF4A6FA5),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: options.map((goal) {
-              final isSelected = goal == selectedGoal;
-              final chipColor = _chipColor(goal);
-              return ChoiceChip(
-                label: Text(goal.label),
-                selected: isSelected,
-                selectedColor: chipColor,
-                backgroundColor: chipColor.withOpacity(0.6),
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF4A6FA5),
-                  fontWeight: FontWeight.w600,
-                ),
-                onSelected: (_) => onSelect(goal),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Goal: ${selectedGoal.label} forest',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF5F7D95),
-            ),
+          _CalmPanel(
+            message: _calmMessage,
+            seeds: stageCounts['seeds']!,
+            sprouts: stageCounts['sprouts']!,
+            grown: stageCounts['grown']!,
+            flowers: _flowers.length,
           ),
         ],
       ),
@@ -549,23 +648,23 @@ class _WeatherSelector extends StatelessWidget {
   }
 }
 
-class _ScorePanel extends StatelessWidget {
-  const _ScorePanel({
-    required this.goalLabel,
-    required this.goalColor,
-    required this.percent,
+class _CalmPanel extends StatelessWidget {
+  const _CalmPanel({
     required this.message,
+    required this.seeds,
+    required this.sprouts,
+    required this.grown,
+    required this.flowers,
   });
 
-  final String goalLabel;
-  final String goalColor;
-  final double percent;
   final String message;
+  final int seeds;
+  final int sprouts;
+  final int grown;
+  final int flowers;
 
   @override
   Widget build(BuildContext context) {
-    final indicatorColor =
-        _TreeStyle.forType(goalColor).leafColor.withOpacity(0.9);
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -578,36 +677,29 @@ class _ScorePanel extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'About ${percent.toStringAsFixed(0)}% like your $goalLabel goal',
+            message,
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Color(0xFF4A6FA5),
             ),
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: percent / 100,
-              minHeight: 10,
-              backgroundColor: const Color(0xFFE2E6F0),
-              valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF5F7D95),
-            ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              _CalmStatChip(label: 'Seeds', value: seeds, emoji: '🫘'),
+              _CalmStatChip(label: 'Sprouts', value: sprouts, emoji: '🌱'),
+              _CalmStatChip(label: 'Trees', value: grown, emoji: '🌳'),
+              _CalmStatChip(label: 'Flowers', value: flowers, emoji: '🌼'),
+            ],
           ),
         ],
       ),
@@ -615,11 +707,34 @@ class _ScorePanel extends StatelessWidget {
   }
 }
 
-class _ForestGoal {
-  const _ForestGoal({required this.label, required this.colors});
+class _CalmStatChip extends StatelessWidget {
+  const _CalmStatChip({
+    required this.label,
+    required this.value,
+    required this.emoji,
+  });
 
   final String label;
-  final List<String> colors;
+  final int value;
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF4FF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        '$emoji $label: $value',
+        style: const TextStyle(
+          color: Color(0xFF4A6FA5),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
 }
 
 enum _VegetationMode { tree, flower }

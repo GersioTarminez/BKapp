@@ -165,24 +165,21 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Expanded(
-              child: TextField(
-                controller: _noteController,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: InputDecoration(
-                  hintText: 'Write something gentle here...',
-                  filled: true,
-                  fillColor: const Color(0xFFF7F9FF),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
+            TextField(
+              controller: _noteController,
+              maxLines: null,
+              textAlignVertical: TextAlignVertical.top,
+              decoration: InputDecoration(
+                hintText: 'Write something gentle here...',
+                filled: true,
+                fillColor: const Color(0xFFF7F9FF),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -202,9 +199,89 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                 child: Text(_isSaving ? 'Saving...' : 'Save'),
               ),
             ),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _entries.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Your diary is waiting for the first emotion.',
+                        style: TextStyle(color: Color(0xFF5F7D95)),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _entries.length,
+                      itemBuilder: (context, index) {
+                        final entry = _entries[_entries.length - 1 - index];
+                        return _EmotionEntryCard(entry: entry);
+                      },
+                    ),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+class _EmotionEntryCard extends StatelessWidget {
+  const _EmotionEntryCard({required this.entry});
+
+  final EmotionEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = entry.date;
+    final dateText =
+        '${_twoDigits(date.day)}/${_twoDigits(date.month)}/${date.year}';
+    final timeText =
+        '${_twoDigits(date.hour)}:${_twoDigits(date.minute)}';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7FF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                entry.emotion,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4A6FA5),
+                ),
+              ),
+              Text(
+                '$dateText · $timeText',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF7A8AA6),
+                ),
+              ),
+            ],
+          ),
+          if (entry.note != null && entry.note!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              entry.note!,
+              style: const TextStyle(
+                fontSize: 15,
+                color: Color(0xFF5F7D95),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _twoDigits(int value) => value.toString().padLeft(2, '0');
 }
