@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../services/experience_flags_service.dart';
 import '../services/sound_service.dart';
 import 'bubble_calm_controller.dart';
 
@@ -13,6 +14,7 @@ class BubbleCalmScreen extends StatefulWidget {
 
 class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
   final BubbleCalmController _controller = BubbleCalmController();
+  final ExperienceFlagsService _flags = ExperienceFlagsService.instance;
   Timer? _timer;
 
   @override
@@ -20,6 +22,9 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
     super.initState();
     _timer = Timer.periodic(const Duration(milliseconds: 30), (_) {
       setState(_controller.tick);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowTip();
     });
   }
 
@@ -29,6 +34,27 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
     super.dispose();
   }
 
+  Future<void> _maybeShowTip() async {
+    final shown = await _flags.wasShown('bubble_tip');
+    if (shown || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Calma de Burbujas'),
+        content: const Text(
+          'Toca las burbujas con calma, escucha su sonido suave y observa cómo desaparecen. No hay prisa.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Comenzar'),
+          ),
+        ],
+      ),
+    );
+    await _flags.markShown('bubble_tip');
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -36,7 +62,7 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bubble Calm'),
+        title: const Text('Calma de Burbujas'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
       ),
@@ -120,7 +146,7 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Tap a bubble to let it float away.',
+                  'Toca una burbuja para dejarla subir suave.',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.9),
                     fontSize: 16,

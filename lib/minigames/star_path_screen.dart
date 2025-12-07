@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../services/experience_flags_service.dart';
+
 class StarPathScreen extends StatefulWidget {
   const StarPathScreen({super.key});
 
@@ -14,6 +16,15 @@ class _StarPathScreenState extends State<StarPathScreen> {
   _TipoObjeto _modoActual = _TipoObjeto.estrella;
   _Emocion _emocionActual = _Emocion.feliz;
   Offset? _ultimoPunto;
+  final ExperienceFlagsService _flags = ExperienceFlagsService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowTip();
+    });
+  }
 
   void _agregarObjeto(Offset posicion) {
     final estilo = _emociones[_emocionActual]!;
@@ -56,6 +67,27 @@ class _StarPathScreenState extends State<StarPathScreen> {
     });
   }
 
+  Future<void> _maybeShowTip() async {
+    final shown = await _flags.wasShown('star_tip');
+    if (shown || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Camino de Estrellas'),
+        content: const Text(
+          'Dibuja constelaciones libres arrastrando tu dedo. No hay líneas perfectas, solo cielos que cuentan historias.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Dibujar'),
+          ),
+        ],
+      ),
+    );
+    await _flags.markShown('star_tip');
+  }
+
   @override
   Widget build(BuildContext context) {
     final emocionChips = _Emocion.values.map((emocion) {
@@ -65,10 +97,10 @@ class _StarPathScreenState extends State<StarPathScreen> {
         label: Text(estilo.icono),
         selected: seleccionado,
         selectedColor: estilo.colorPrimario.withOpacity(0.8),
-        backgroundColor: estilo.colorPrimario.withOpacity(0.25),
+        backgroundColor: Colors.white.withOpacity(0.2),
         labelStyle: TextStyle(
           fontSize: 24,
-          color: seleccionado ? Colors.white : Colors.white70,
+          color: Colors.white,
         ),
         onSelected: (_) {
           setState(() => _emocionActual = emocion);
@@ -81,11 +113,18 @@ class _StarPathScreenState extends State<StarPathScreen> {
       return ChoiceChip(
         label: Text(_nombresObjeto[tipo]!),
         selected: seleccionado,
-        selectedColor: Colors.white.withOpacity(0.3),
-        backgroundColor: Colors.white.withOpacity(0.1),
+        selectedColor: const Color(0xFFFFE082),
+        backgroundColor: Colors.white.withOpacity(0.6),
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: Colors.white.withOpacity(seleccionado ? 0.0 : 0.7),
+            width: 1.3,
+          ),
+        ),
         labelStyle: TextStyle(
-          color: Colors.white,
-          fontWeight: seleccionado ? FontWeight.bold : FontWeight.w500,
+          color: seleccionado ? const Color(0xFF3B2400) : const Color(0xFF0F1A2B),
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
         onSelected: (_) {
           setState(() => _modoActual = tipo);
@@ -95,7 +134,7 @@ class _StarPathScreenState extends State<StarPathScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Star Path'),
+        title: const Text('Camino de Estrellas'),
         backgroundColor: const Color(0xFF0F1A2B),
         foregroundColor: Colors.white,
         actions: [

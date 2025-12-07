@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/preferences_service.dart';
+import '../widgets/breathing_widget.dart';
 import 'menu_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -107,6 +108,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                       child: const Text('Comenzar'),
+                    ),
+                    const SizedBox(height: 28),
+                    const BreathingWidget(),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Respira despacio antes de entrar.',
+                      style: TextStyle(
+                        color: Color(0xFF4E6C93),
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),

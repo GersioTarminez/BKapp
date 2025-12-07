@@ -19,7 +19,7 @@ class AvatarPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: size,
-      height: size * 1.2,
+      height: size * 1.35,
       child: CustomPaint(
         painter: _AvatarPainter(profile),
       ),
@@ -44,6 +44,7 @@ class _AvatarPainter extends CustomPainter {
     _drawFace(canvas, size, faceColor);
     _drawExpression(canvas, size);
     _drawShoes(canvas, size);
+    _drawCompanion(canvas, size);
   }
 
   void _drawBody(Canvas canvas, Size size, double bodyTop) {
@@ -344,6 +345,131 @@ class _AvatarPainter extends CustomPainter {
         shoesPaint,
       );
     }
+  }
+
+  void _drawCompanion(Canvas canvas, Size size) {
+    final groundY = size.height * 0.98;
+    final baseX = size.width * 0.7;
+    final bodyPaint = Paint()..style = PaintingStyle.fill;
+    final accentPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.white.withOpacity(0.85);
+
+    switch (profile.companionType) {
+      case 'cat':
+        bodyPaint.color = const Color(0xFFD8C3FF);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(baseX, groundY - 20),
+            width: 36,
+            height: 32,
+          ),
+          bodyPaint,
+        );
+        canvas.drawCircle(
+          Offset(baseX, groundY - 40),
+          12,
+          bodyPaint,
+        );
+        final earPaint = Paint()..color = const Color(0xFFC3A0F3);
+        canvas.drawPath(
+          Path()
+            ..moveTo(baseX - 10, groundY - 46)
+            ..lineTo(baseX - 18, groundY - 60)
+            ..lineTo(baseX - 4, groundY - 50),
+          earPaint,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(baseX + 10, groundY - 46)
+            ..lineTo(baseX + 18, groundY - 60)
+            ..lineTo(baseX + 4, groundY - 50),
+          earPaint,
+        );
+        final eyeCenter = Offset(baseX, groundY - 42);
+        _drawCompanionFace(canvas, eyeCenter, 6, 4);
+        break;
+      case 'hamster':
+        bodyPaint.color = const Color(0xFFFFE5B4);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset(baseX, groundY - 18),
+              width: 32,
+              height: 36,
+            ),
+            const Radius.circular(16),
+          ),
+          bodyPaint,
+        );
+        canvas.drawCircle(
+          Offset(baseX - 8, groundY - 40),
+          9,
+          bodyPaint,
+        );
+        canvas.drawCircle(
+          Offset(baseX + 8, groundY - 40),
+          9,
+          bodyPaint,
+        );
+        final eyeCenter = Offset(baseX, groundY - 34);
+        _drawCompanionFace(canvas, eyeCenter, 6, 6);
+        break;
+      case 'dog':
+      default:
+        bodyPaint.color = const Color(0xFFBFA087);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(baseX, groundY - 18),
+            width: 42,
+            height: 28,
+          ),
+          bodyPaint,
+        );
+        canvas.drawCircle(
+          Offset(baseX + 14, groundY - 32),
+          12,
+          bodyPaint,
+        );
+        final earPaint = Paint()..color = const Color(0xFF9E8167);
+        canvas.drawCircle(
+          Offset(baseX + 20, groundY - 36),
+          6,
+          earPaint,
+        );
+        canvas.drawCircle(
+          Offset(baseX + 8, groundY - 36),
+          6,
+          earPaint,
+        );
+        final eyeCenter = Offset(baseX + 14, groundY - 32);
+        _drawCompanionFace(canvas, eyeCenter, 4, 0);
+        break;
+    }
+  }
+
+  void _drawCompanionFace(
+    Canvas canvas,
+    Offset center,
+    double eyeOffset,
+    double noseOffsetX,
+  ) {
+    final eyePaint = Paint()..color = const Color(0xFF4A6FA5);
+    canvas.drawCircle(
+      center.translate(-eyeOffset, 0),
+      2.2,
+      eyePaint,
+    );
+    canvas.drawCircle(
+      center.translate(eyeOffset, 0),
+      2.2,
+      eyePaint,
+    );
+    canvas.drawCircle(
+      center.translate(noseOffsetX, 6),
+      2.8,
+      Paint()..color = Colors.white.withOpacity(0.9),
+    );
   }
 
   @override

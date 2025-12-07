@@ -10,6 +10,7 @@ class AvatarProfile {
     required this.shirtColor,
     required this.shoesType,
     required this.shoesColor,
+    required this.companionType,
   });
 
   final String hairType;
@@ -20,6 +21,7 @@ class AvatarProfile {
   final String shirtColor;
   final String shoesType;
   final String shoesColor;
+  final String companionType;
 
   static AvatarProfile defaults() => AvatarProfile(
         hairType: 'short',
@@ -30,6 +32,7 @@ class AvatarProfile {
         shirtColor: '#A4E4AF',
         shoesType: 'simple',
         shoesColor: '#D8CFFF',
+        companionType: 'dog',
       );
 
   AvatarProfile copyWith({
@@ -41,6 +44,7 @@ class AvatarProfile {
     String? shirtColor,
     String? shoesType,
     String? shoesColor,
+    String? companionType,
   }) {
     return AvatarProfile(
       hairType: hairType ?? this.hairType,
@@ -51,6 +55,7 @@ class AvatarProfile {
       shirtColor: shirtColor ?? this.shirtColor,
       shoesType: shoesType ?? this.shoesType,
       shoesColor: shoesColor ?? this.shoesColor,
+      companionType: companionType ?? this.companionType,
     );
   }
 
@@ -64,6 +69,7 @@ class AvatarProfile {
       'shirtColor': shirtColor,
       'shoesType': shoesType,
       'shoesColor': shoesColor,
+      'companionType': companionType,
     };
   }
 
@@ -77,6 +83,7 @@ class AvatarProfile {
       shirtColor: json['shirtColor'] as String? ?? '#A4E4AF',
       shoesType: json['shoesType'] as String? ?? 'simple',
       shoesColor: json['shoesColor'] as String? ?? '#D8CFFF',
+      companionType: json['companionType'] as String? ?? 'dog',
     );
   }
 

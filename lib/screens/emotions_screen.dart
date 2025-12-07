@@ -20,11 +20,11 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
   List<EmotionEntry> _entries = [];
   AvatarProfile? _avatarProfile;
   final List<String> _emotions = const [
-    'Happy',
-    'Calm',
-    'Sad',
-    'Scared',
-    'Angry',
+    'Feliz',
+    'Calmado',
+    'Triste',
+    'Asustado',
+    'Enfadado',
   ];
 
   String? _selectedEmotion;
@@ -57,7 +57,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
     if (_selectedEmotion == null || _isSaving) {
       if (_selectedEmotion == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please choose an emotion first.')),
+          const SnackBar(content: Text('Por favor, elige una emoción primero.')),
         );
       }
       return;
@@ -85,8 +85,27 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Emotion saved')),
+      const SnackBar(content: Text('Emoción guardada')),
     );
+  }
+
+  Future<void> _deleteEntry(EmotionEntry entry) async {
+    setState(() {
+      _entries = _entries.where((e) => e != entry).toList();
+    });
+    await _storageService.saveEntries(_entries);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Entrada eliminada')),
+    );
+  }
+
+  Map<String, int> _emotionCounts() {
+    final counts = <String, int>{};
+    for (final entry in _entries) {
+      counts.update(entry.emotion, (value) => value + 1, ifAbsent: () => 1);
+    }
+    return counts;
   }
 
   @override
@@ -99,7 +118,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Emotions'),
+        title: const Text('Emociones'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
       ),
@@ -115,7 +134,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                     AvatarPreview(profile: _avatarProfile!, size: 150),
                     const SizedBox(height: 12),
                     const Text(
-                      'Your friend asks:',
+                      'Tu amigo pregunta:',
                       style: TextStyle(
                         fontSize: 16,
                         color: Color(0xFF5F7D95),
@@ -127,7 +146,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
               const SizedBox(height: 12),
             ],
             const Text(
-              'How did you feel today?',
+              '¿Cómo te sentiste hoy?',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -157,8 +176,12 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
               }).toList(),
             ),
             const SizedBox(height: 24),
+            if (_entries.isNotEmpty) ...[
+              _EmotionSummary(counts: _emotionCounts()),
+              const SizedBox(height: 20),
+            ],
             const Text(
-              'Want to add a note?',
+              '¿Quieres añadir una nota?',
               style: TextStyle(
                 fontSize: 18,
                 color: Color(0xFF5F7D95),
@@ -170,7 +193,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
               maxLines: null,
               textAlignVertical: TextAlignVertical.top,
               decoration: InputDecoration(
-                hintText: 'Write something gentle here...',
+                  hintText: 'Escribe algo suave aquí...',
                 filled: true,
                 fillColor: const Color(0xFFF7F9FF),
                 border: OutlineInputBorder(
@@ -196,7 +219,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: Text(_isSaving ? 'Saving...' : 'Save'),
+                child: Text(_isSaving ? 'Guardando...' : 'Guardar'),
               ),
             ),
             const SizedBox(height: 20),
@@ -206,7 +229,7 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
               child: _entries.isEmpty
                   ? const Center(
                       child: Text(
-                        'Your diary is waiting for the first emotion.',
+                        'Tu diario espera la primera emoción.',
                         style: TextStyle(color: Color(0xFF5F7D95)),
                       ),
                     )
@@ -214,7 +237,43 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
                       itemCount: _entries.length,
                       itemBuilder: (context, index) {
                         final entry = _entries[_entries.length - 1 - index];
-                        return _EmotionEntryCard(entry: entry);
+                        return Dismissible(
+                          key: ValueKey('${entry.date.toIso8601String()}_${entry.emotion}'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFC1C1),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: const Icon(Icons.delete, color: Color(0xFF8C4351)),
+                          ),
+                          confirmDismiss: (_) async {
+                            return await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                            title: const Text('¿Eliminar entrada?'),
+                            content: const Text(
+                                '¿Quieres borrar esta entrada del diario?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('Conservar'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('Borrar'),
+                                      ),
+                                    ],
+                                  ),
+                                ) ??
+                                false;
+                          },
+                          onDismissed: (_) => _deleteEntry(entry),
+                          child: _EmotionEntryCard(entry: entry),
+                        );
                       },
                     ),
             ),
@@ -284,4 +343,67 @@ class _EmotionEntryCard extends StatelessWidget {
   }
 
   String _twoDigits(int value) => value.toString().padLeft(2, '0');
+}
+
+class _EmotionSummary extends StatelessWidget {
+  const _EmotionSummary({required this.counts});
+
+  final Map<String, int> counts;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF4FF),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Susurros de tu ánimo',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF35527D),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            children: items
+                .map(
+                  (entry) => Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      '${entry.key}: ${entry.value}',
+                      style: const TextStyle(
+                        color: Color(0xFF4A6FA5),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
 }

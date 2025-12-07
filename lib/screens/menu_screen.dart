@@ -14,33 +14,33 @@ class MenuScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       _MenuItem(
-        title: 'Bubble Calm',
-        subtitle: 'Relaxing bubbles',
+        title: 'Calma de Burbujas',
+        subtitle: 'Burbujas para relajarte',
         builder: () => const BubbleCalmScreen(),
       ),
       _MenuItem(
-        title: 'Star Path',
-        subtitle: 'Draw stars and lines',
+        title: 'Camino de Estrellas',
+        subtitle: 'Dibuja constelaciones calmadas',
         builder: () => const StarPathScreen(),
       ),
       _MenuItem(
-        title: 'Seed Garden',
-        subtitle: 'Plant small seeds',
+        title: 'Jardín de Semillas',
+        subtitle: 'Planta y cuida tu bosque',
         builder: () => const SeedGardenScreen(),
       ),
       _MenuItem(
-        title: 'Emotions',
-        subtitle: 'How I feel today',
+        title: 'Emociones',
+        subtitle: 'Cómo me siento hoy',
         builder: () => const EmotionsScreen(),
       ),
       _MenuItem(
-        title: 'Create My Avatar',
-        subtitle: 'Design a calm friend',
+        title: 'Crear mi Avatar',
+        subtitle: 'Diseña tu amigo tranquilo',
         builder: () => const AvatarScreen(),
       ),
       _MenuItem(
-        title: 'Calm Settings',
-        subtitle: 'Info & soft preferences',
+        title: 'Ajustes Calmos',
+        subtitle: 'Información y preferencias',
         builder: () => const SettingsScreen(),
       ),
     ];

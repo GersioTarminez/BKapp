@@ -42,7 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Calm Settings'),
+        title: const Text('Ajustes calmos'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
       ),
@@ -50,7 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           const Text(
-            'Preferences',
+            'Preferencias',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -59,8 +59,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 12),
           _buildToggle(
-            title: 'Soft sounds',
-            subtitle: 'Turn gentle effects on or off.',
+            title: 'Sonidos suaves',
+            subtitle: 'Activa o desactiva los efectos calmados.',
             value: _soundOn,
             onChanged: (value) {
               setState(() => _soundOn = value);
@@ -68,8 +68,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           _buildToggle(
-            title: 'Show welcome tips',
-            subtitle: 'Display the intro message on the home screen.',
+            title: 'Mostrar mensaje inicial',
+            subtitle: 'Enseña la frase de bienvenida en la pantalla principal.',
             value: _showIntro,
             onChanged: (value) {
               setState(() => _showIntro = value);
@@ -78,7 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
           const Text(
-            'About BrisaKids',
+            'Sobre BrisaKids',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -88,26 +88,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           _buildInfoCard(
             icon: Icons.favorite,
-            title: 'Purpose',
+            title: 'Propósito',
             description:
-                'BrisaKids is a university project that offers calm mini-games and a simple emotions diary for children facing long treatments.',
+                'BrisaKids es un proyecto universitario que ofrece mini-juegos calmados y un diario emocional para niños en tratamientos largos.',
           ),
           _buildInfoCard(
             icon: Icons.shield_outlined,
-            title: 'Privacy',
+            title: 'Privacidad',
             description:
-                'All data stays on this device. No accounts, analytics, or advertisements are included.',
+                'Todos los datos se quedan en este dispositivo. No hay cuentas, ni analíticas, ni publicidad.',
           ),
           _buildInfoCard(
             icon: Icons.music_note,
-            title: 'Assets & sounds',
+            title: 'Arte y sonidos',
             description:
-                'The app combines original pastel artwork with curated free assets. All sounds are gentle and optional.',
+                'La app mezcla ilustraciones pastel propias con recursos libres seleccionados. Los sonidos son suaves y opcionales.',
           ),
           const SizedBox(height: 16),
           Center(
             child: Text(
-              'Version 0.1.0 – Alpha build\nSergio Martínez París · TFG',
+              'Versión 0.1.0 – Alpha\nSergio Martínez París · TFG',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFF5F7D95),

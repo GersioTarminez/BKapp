@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../models/garden_plant.dart';
+import '../services/experience_flags_service.dart';
 import '../services/garden_storage_service.dart';
 
 class SeedGardenScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   final GlobalKey _gardenKey = GlobalKey();
   static const List<String> _calmTreeTypes = ['Green', 'Blue', 'Yellow', 'Red', 'White'];
   final GardenStorageService _gardenStorage = GardenStorageService();
+  final ExperienceFlagsService _flags = ExperienceFlagsService.instance;
   _VegetationMode _mode = _VegetationMode.tree;
   _WeatherType _weather = _WeatherType.sunny;
   late _GardenMap _gardenMap;
@@ -30,7 +32,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   Timer? _growthTimer;
   Timer? _saveDebounce;
   int _counter = 0;
-  String _calmMessage = 'Tap anywhere to grow your calm forest.';
+  String _calmMessage = 'Toca en cualquier lugar para hacer crecer tu bosque tranquilo.';
   Size _gardenSize = Size.zero;
 
   @override
@@ -48,6 +50,9 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       _updateGrowth();
     });
     _loadGarden();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowTip();
+    });
   }
 
   _GardenMap _generateMap() {
@@ -270,7 +275,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
 
   void _refreshCalmMessage() {
     if (_trees.isEmpty) {
-      _calmMessage = 'Tap anywhere to grow your calm forest.';
+      _calmMessage = 'Toca en cualquier lugar para hacer crecer tu bosque tranquilo.';
       return;
     }
     final counts = _stageCounts();
@@ -281,22 +286,22 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
 
     final parts = <String>[];
     if (grown > 0) {
-      parts.add('$grown calm tree${grown == 1 ? '' : 's'} watching over the garden');
+      parts.add(
+          '$grown árbol${grown == 1 ? '' : 'es'} tranquil${grown == 1 ? 'o' : 'os'} cuidando el jardín');
     }
     if (sprouts > 0) {
-      parts.add('$sprouts sprout${sprouts == 1 ? '' : 's'} stretching quietly');
+      parts.add('$sprouts brote${sprouts == 1 ? '' : 's'} estirándose con calma');
     }
     if (seeds > 0) {
-      parts.add('$seeds seed${seeds == 1 ? '' : 's'} resting in the soil');
+      parts.add('$seeds semilla${seeds == 1 ? '' : 's'} descansando en la tierra');
     }
     var message = parts.join(', ');
     if (flowers > 0) {
-      message += message.isEmpty
-          ? '$flowers flower${flowers == 1 ? '' : 's'} smiling nearby.'
-          : '. $flowers flower${flowers == 1 ? '' : 's'} smiling nearby.';
+      final florTexto = '$flowers flor${flowers == 1 ? '' : 'es'} sonriendo cerca';
+      message = message.isEmpty ? florTexto : '$message. $florTexto';
     }
     _calmMessage = message.isEmpty
-        ? 'Your garden is quiet and waiting for new life.'
+        ? 'Tu jardín está en silencio y espera nueva vida.'
         : '$message.';
   }
 
@@ -428,12 +433,33 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
     super.dispose();
   }
 
+  Future<void> _maybeShowTip() async {
+    final shown = await _flags.wasShown('garden_tip');
+    if (shown || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Jardín de Semillas'),
+        content: const Text(
+          'Planta semillas y obsérvalas crecer poco a poco. Respira y cuida tu bosque con paciencia.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Plantar'),
+          ),
+        ],
+      ),
+    );
+    await _flags.markShown('garden_tip');
+  }
+
   @override
   Widget build(BuildContext context) {
     final stageCounts = _stageCounts();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Seed Garden'),
+        title: const Text('Jardín de Semillas'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
       ),
@@ -555,7 +581,7 @@ class _ModeSelector extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'What would you like to plant?',
+            '¿Qué te gustaría plantar?',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -566,8 +592,8 @@ class _ModeSelector extends StatelessWidget {
           Wrap(
             spacing: 12,
             children: [
-              _buildChip('Trees', _VegetationMode.tree),
-              _buildChip('Flowers', _VegetationMode.flower),
+              _buildChip('Árboles', _VegetationMode.tree),
+              _buildChip('Flores', _VegetationMode.flower),
             ],
           ),
         ],
@@ -610,7 +636,7 @@ class _WeatherSelector extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Choose the weather',
+            'Elige el clima',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -621,10 +647,10 @@ class _WeatherSelector extends StatelessWidget {
           Wrap(
             spacing: 12,
             children: [
-              _buildChip('Sunny ☀️', _WeatherType.sunny),
-              _buildChip('Cloudy ☁️', _WeatherType.cloudy),
-              _buildChip('Rainy 🌧️', _WeatherType.rainy),
-              _buildChip('Snowy ❄️', _WeatherType.snowy),
+              _buildChip('Soleado ☀️', _WeatherType.sunny),
+              _buildChip('Nublado ☁️', _WeatherType.cloudy),
+              _buildChip('Lluvioso 🌧️', _WeatherType.rainy),
+              _buildChip('Nevado ❄️', _WeatherType.snowy),
             ],
           ),
         ],
@@ -695,10 +721,10 @@ class _CalmPanel extends StatelessWidget {
             spacing: 12,
             runSpacing: 8,
             children: [
-              _CalmStatChip(label: 'Seeds', value: seeds, emoji: '🫘'),
-              _CalmStatChip(label: 'Sprouts', value: sprouts, emoji: '🌱'),
-              _CalmStatChip(label: 'Trees', value: grown, emoji: '🌳'),
-              _CalmStatChip(label: 'Flowers', value: flowers, emoji: '🌼'),
+              _CalmStatChip(label: 'Semillas', value: seeds, emoji: '🫘'),
+              _CalmStatChip(label: 'Brotes', value: sprouts, emoji: '🌱'),
+              _CalmStatChip(label: 'Árboles', value: grown, emoji: '🌳'),
+              _CalmStatChip(label: 'Flores', value: flowers, emoji: '🌼'),
             ],
           ),
         ],

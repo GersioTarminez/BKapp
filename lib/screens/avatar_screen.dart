@@ -29,6 +29,7 @@ class _AvatarScreenState extends State<AvatarScreen> {
   final List<String> _expressions = ['neutral', 'smile', 'happy'];
   final List<String> _shirtTypes = ['basic', 'stripe', 'hoodie'];
   final List<String> _shoeTypes = ['simple', 'sneakers', 'boots'];
+  final List<String> _companionTypes = ['dog', 'cat', 'hamster'];
 
   final List<Color> _hairColors = [
     const Color(0xFFFFD1DC),
@@ -54,6 +55,39 @@ class _AvatarScreenState extends State<AvatarScreen> {
     const Color(0xFFFFE6EB),
   ];
 
+  final Map<String, String> _hairLabels = const {
+    'short': 'Corto',
+    'long': 'Largo',
+    'curly': 'Rizado',
+    'straight': 'Liso',
+    'pony': 'Coleta',
+    'bald': 'Sin pelo',
+  };
+
+  final Map<String, String> _faceLabels = const {
+    'round': 'Redondo',
+    'oval': 'Ovalado',
+    'square': 'Cuadrado',
+  };
+
+  final Map<String, String> _expressionLabels = const {
+    'neutral': 'Neutral',
+    'smile': 'Sonrisa',
+    'happy': 'Muy feliz',
+  };
+
+  final Map<String, String> _shirtLabels = const {
+    'basic': 'Básica',
+    'stripe': 'Rayas suaves',
+    'hoodie': 'Sudadera',
+  };
+
+  final Map<String, String> _shoeLabels = const {
+    'simple': 'Sencillos',
+    'sneakers': 'Zapatillas',
+    'boots': 'Botas',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -74,15 +108,16 @@ class _AvatarScreenState extends State<AvatarScreen> {
     if (!mounted) return;
     setState(() => _isSaving = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Avatar saved!')),
+      const SnackBar(content: Text('¡Avatar guardado!')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FF),
       appBar: AppBar(
-        title: const Text('Create My Avatar'),
+        title: const Text('Crear mi avatar'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
       ),
@@ -94,20 +129,40 @@ class _AvatarScreenState extends State<AvatarScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
-                    child: AvatarPreview(profile: _profile, size: 200),
+                    child: Column(
+                      children: [
+                        AvatarPreview(profile: _profile, size: 200),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Compañero: ${_companionLabel(_profile.companionType)}',
+                          style: const TextStyle(
+                            color: Color(0xFF4A6FA5),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Toca los botones para cambiar colores, formas y elegir un compañero calmado.',
+                    style: TextStyle(
+                      color: Color(0xFF5F7D95),
+                    ),
                   ),
                   const SizedBox(height: 24),
                   _buildSection(
-                    title: 'Hair Style',
+                    title: 'Peinado',
                     child: _buildChoiceWrap(
                       options: _hairTypes,
                       selected: _profile.hairType,
+                      labelBuilder: _hairLabel,
                       onSelect: (value) =>
                           _updateProfile(_profile.copyWith(hairType: value)),
                     ),
                   ),
                   _buildSection(
-                    title: 'Hair Color',
+                    title: 'Color del pelo',
                     child: _buildColorWrap(
                       options: _hairColors,
                       selectedHex: _profile.hairColor,
@@ -119,31 +174,34 @@ class _AvatarScreenState extends State<AvatarScreen> {
                     ),
                   ),
                   _buildSection(
-                    title: 'Face Shape',
+                    title: 'Forma del rostro',
                     child: _buildChoiceWrap(
                       options: _faceTypes,
                       selected: _profile.faceType,
+                      labelBuilder: _faceLabel,
                       onSelect: (value) =>
                           _updateProfile(_profile.copyWith(faceType: value)),
                     ),
                   ),
                   _buildSection(
-                    title: 'Expression',
+                    title: 'Expresión',
                     child: _buildChoiceWrap(
                       options: _expressions,
                       selected: _profile.expression,
+                      labelBuilder: _expressionLabel,
                       onSelect: (value) =>
                           _updateProfile(_profile.copyWith(expression: value)),
                     ),
                   ),
                   _buildSection(
-                    title: 'Clothing',
+                    title: 'Ropa',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildChoiceWrap(
                           options: _shirtTypes,
                           selected: _profile.shirtType,
+                          labelBuilder: _shirtLabel,
                           onSelect: (value) => _updateProfile(
                             _profile.copyWith(shirtType: value),
                           ),
@@ -162,13 +220,14 @@ class _AvatarScreenState extends State<AvatarScreen> {
                     ),
                   ),
                   _buildSection(
-                    title: 'Footwear',
+                    title: 'Calzado',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildChoiceWrap(
                           options: _shoeTypes,
                           selected: _profile.shoesType,
+                          labelBuilder: _shoeLabel,
                           onSelect: (value) =>
                               _updateProfile(_profile.copyWith(shoesType: value)),
                         ),
@@ -185,6 +244,10 @@ class _AvatarScreenState extends State<AvatarScreen> {
                       ],
                     ),
                   ),
+                  _buildSection(
+                    title: 'Compañero calmado',
+                    child: _buildCompanionRow(),
+                  ),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -199,7 +262,7 @@ class _AvatarScreenState extends State<AvatarScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      child: Text(_isSaving ? 'Saving...' : 'Save Avatar'),
+                      child: Text(_isSaving ? 'Guardando...' : 'Guardar avatar'),
                     ),
                   ),
                 ],
@@ -209,8 +272,20 @@ class _AvatarScreenState extends State<AvatarScreen> {
   }
 
   Widget _buildSection({required String title, required Widget child}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -218,11 +293,11 @@ class _AvatarScreenState extends State<AvatarScreen> {
             title,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               color: Color(0xFF4A6FA5),
             ),
           ),
-          const SizedBox(height: 8),
+          const Divider(height: 16, thickness: 0.8),
           child,
         ],
       ),
@@ -233,6 +308,7 @@ class _AvatarScreenState extends State<AvatarScreen> {
     required List<String> options,
     required String selected,
     required ValueChanged<String> onSelect,
+    String Function(String)? labelBuilder,
   }) {
     return Wrap(
       spacing: 10,
@@ -240,7 +316,7 @@ class _AvatarScreenState extends State<AvatarScreen> {
       children: options.map((item) {
         final isSelected = selected == item;
         return ChoiceChip(
-          label: Text(_capitalize(item)),
+          label: Text(labelBuilder?.call(item) ?? _capitalize(item)),
           selected: isSelected,
           selectedColor: const Color(0xFF8FB3FF),
           backgroundColor: const Color(0xFFE0E7FF),
@@ -289,6 +365,56 @@ class _AvatarScreenState extends State<AvatarScreen> {
     );
   }
 
+  Widget _buildCompanionRow() {
+    return Wrap(
+      spacing: 12,
+      children: _companionTypes.map((type) {
+        final isSelected = _profile.companionType == type;
+        return GestureDetector(
+          onTap: () => _updateProfile(_profile.copyWith(companionType: type)),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? const Color(0xFF8FB3FF).withOpacity(0.2)
+                  : const Color(0xFFEFF4FF),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isSelected ? const Color(0xFF8FB3FF) : Colors.transparent,
+                width: 2,
+              ),
+              boxShadow: [
+                if (isSelected)
+                  BoxShadow(
+                    color: const Color(0xFF8FB3FF).withOpacity(0.25),
+                    blurRadius: 8,
+                  ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _companionEmoji(type),
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _companionLabel(type),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isSelected ? const Color(0xFF35527D) : const Color(0xFF4A6FA5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   void _updateProfile(AvatarProfile profile) {
     setState(() {
       _profile = profile;
@@ -297,4 +423,35 @@ class _AvatarScreenState extends State<AvatarScreen> {
 
   String _capitalize(String text) =>
       text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
+
+  String _hairLabel(String value) => _hairLabels[value] ?? _capitalize(value);
+  String _faceLabel(String value) => _faceLabels[value] ?? _capitalize(value);
+  String _expressionLabel(String value) =>
+      _expressionLabels[value] ?? _capitalize(value);
+  String _shirtLabel(String value) => _shirtLabels[value] ?? _capitalize(value);
+  String _shoeLabel(String value) => _shoeLabels[value] ?? _capitalize(value);
+
+  String _companionLabel(String value) {
+    switch (value) {
+      case 'cat':
+        return 'Gato';
+      case 'hamster':
+        return 'Hámster';
+      case 'dog':
+      default:
+        return 'Perro';
+    }
+  }
+
+  String _companionEmoji(String type) {
+    switch (type) {
+      case 'cat':
+        return '🐱';
+      case 'hamster':
+        return '🐹';
+      case 'dog':
+      default:
+        return '🐶';
+    }
+  }
 }
