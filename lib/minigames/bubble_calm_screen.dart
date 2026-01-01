@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/experience_flags_service.dart';
+import '../services/session_stats_service.dart';
 import '../services/sound_service.dart';
 import 'bubble_calm_controller.dart';
 
@@ -15,11 +16,14 @@ class BubbleCalmScreen extends StatefulWidget {
 class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
   final BubbleCalmController _controller = BubbleCalmController();
   final ExperienceFlagsService _flags = ExperienceFlagsService.instance;
+  final SessionStatsService _stats = SessionStatsService.instance;
   Timer? _timer;
+  bool _currentTapHitBubble = false;
 
   @override
   void initState() {
     super.initState();
+    _stats.startSession();
     _timer = Timer.periodic(const Duration(milliseconds: 30), (_) {
       setState(_controller.tick);
     });
@@ -31,6 +35,7 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _stats.endSession();
     super.dispose();
   }
 
@@ -65,98 +70,154 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
         title: const Text('Calma de Burbujas'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFBFD7FF),
-          image: DecorationImage(
-            image: AssetImage('assets/images/bubble_bg.png'),
-            repeat: ImageRepeat.repeat,
-            opacity: 0.35,
+        actions: [
+          IconButton(
+            tooltip: 'Información de sesión',
+            icon: const Icon(Icons.insights),
+            onPressed: _showSessionInfo,
           ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: 26,
-              left: 20,
-              right: 20,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: const Text(
-                  'Respira hondo y deja que las burbujas suban lentas como tus pensamientos.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF35527D),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTapDown: (_) {
+          _currentTapHitBubble = false;
+          Future.microtask(() {
+            if (!_currentTapHitBubble) {
+              _stats.recordMiss();
+            }
+          });
+        },
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFBFD7FF),
+            image: DecorationImage(
+              image: AssetImage('assets/images/bubble_bg.png'),
+              repeat: ImageRepeat.repeat,
+              opacity: 0.35,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: 26,
+                left: 20,
+                right: 20,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Text(
+                    'Respira hondo y deja que las burbujas suban lentas como tus pensamientos.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF35527D),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
-            ..._controller.bubbles.map((burbuja) {
-              return Positioned(
-                left: burbuja.x,
-                top: burbuja.y,
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _controller.explode(burbuja);
-                      SoundService.instance.playBubblePop();
-                    });
-                  },
-                  child: Opacity(
-                    opacity: burbuja.isExploding
-                        ? (1 - burbuja.explosionProgress).clamp(0.0, 1.0)
-                        : 1,
-                    child: Transform.scale(
-                      scale: burbuja.isExploding
-                          ? 1 + burbuja.explosionProgress * 0.3
+              ..._controller.bubbles.map(
+                (burbuja) => Positioned(
+                  left: burbuja.x,
+                  top: burbuja.y,
+                  child: GestureDetector(
+                    onTap: () {
+                      _currentTapHitBubble = true;
+                      _stats.recordPop();
+                      setState(() {
+                        _controller.explode(burbuja);
+                        SoundService.instance.playBubblePop();
+                      });
+                    },
+                    child: Opacity(
+                      opacity: burbuja.isExploding
+                          ? (1 - burbuja.explosionProgress).clamp(0.0, 1.0)
                           : 1,
-                      child: Container(
-                        width: burbuja.size,
-                        height: burbuja.size,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.35),
-                          boxShadow: [
-                            BoxShadow(
-                              blurRadius: 8,
-                              color: Colors.white.withOpacity(0.45),
+                      child: Transform.scale(
+                        scale: burbuja.isExploding
+                            ? 1 + burbuja.explosionProgress * 0.3
+                            : 1,
+                        child: Container(
+                          width: burbuja.size,
+                          height: burbuja.size,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.35),
+                            boxShadow: [
+                              BoxShadow(
+                                blurRadius: 8,
+                                color: Colors.white.withOpacity(0.45),
+                              ),
+                            ],
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.6),
+                              width: 2,
                             ),
-                          ],
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.6),
-                            width: 2,
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              );
-            }),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Toca una burbuja para dejarla subir suave.',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 16,
+              ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Toca una burbuja para dejarla subir suave.',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Future<void> _showSessionInfo() async {
+    final sessions = await _stats.loadSessions();
+    if (!mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        if (sessions.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('No session data yet.'),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: sessions.length,
+          itemBuilder: (context, index) {
+            final session = sessions[sessions.length - 1 - index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                title: Text(
+                  'Sesión ${session.startedAt.toLocal()}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                subtitle: Text(
+                  'Burbujas: ${session.bubblesPopped} • Fallos: ${session.missedTaps}\nPromedio toque: ${session.meanIntervalMs?.toStringAsFixed(1) ?? '-'} ms',
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../models/garden_plant.dart';
 import '../services/experience_flags_service.dart';
 import '../services/garden_storage_service.dart';
+import '../services/session_stats_service.dart';
 
 class SeedGardenScreen extends StatefulWidget {
   const SeedGardenScreen({super.key});
@@ -23,6 +24,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   static const List<String> _calmTreeTypes = ['Green', 'Blue', 'Yellow', 'Red', 'White'];
   final GardenStorageService _gardenStorage = GardenStorageService();
   final ExperienceFlagsService _flags = ExperienceFlagsService.instance;
+  final SessionStatsService _stats = SessionStatsService.instance;
   _VegetationMode _mode = _VegetationMode.tree;
   _WeatherType _weather = _WeatherType.sunny;
   late _GardenMap _gardenMap;
@@ -38,6 +40,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   @override
   void initState() {
     super.initState();
+    _stats.startGardenSession();
     _gardenMap = _generateMap();
     _animalController = AnimationController(
       vsync: this,
@@ -190,6 +193,10 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
         if (tree.growth >= 1) continue;
         tree.growth = (tree.growth + 0.03 + _random.nextDouble() * 0.02)
             .clamp(0.0, 1.0);
+        if (!tree.hasMatured && tree.growth >= 2 / 3) {
+          tree.hasMatured = true;
+          _stats.recordTreeMatured();
+        }
         updated = true;
       }
       if (updated) {
@@ -245,10 +252,12 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
           seedColor: style.seedColor,
           accentColor: style.accentColor,
           growth: 0,
+          hasMatured: false,
         ),
       );
       _refreshCalmMessage();
     });
+    _stats.recordSeedPlanted();
     _scheduleSave();
   }
 
@@ -271,6 +280,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       );
       _refreshCalmMessage();
     });
+    _stats.recordFlowerPlanted();
   }
 
   void _refreshCalmMessage() {
@@ -349,6 +359,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       seedColor: style.seedColor,
       accentColor: style.accentColor,
       growth: growth,
+      hasMatured: growth >= 2 / 3,
     );
   }
 
@@ -430,6 +441,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
     _saveDebounce?.cancel();
     unawaited(_persistGarden());
     _animalController.dispose();
+    unawaited(_stats.endGardenSession());
     super.dispose();
   }
 
@@ -857,6 +869,7 @@ class _Tree {
     required this.seedColor,
     required this.accentColor,
     required this.growth,
+    required this.hasMatured,
   });
 
   final String id;
@@ -866,6 +879,7 @@ class _Tree {
   final Color seedColor;
   final Color accentColor;
   double growth;
+  bool hasMatured;
 }
 
 class _Flower {
