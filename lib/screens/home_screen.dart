@@ -14,17 +14,29 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final PreferencesService _preferences = PreferencesService.instance;
   bool _showIntroMessage = true;
+  late final TextEditingController _nameController;
 
   @override
   void initState() {
     super.initState();
+    _nameController = TextEditingController();
     _loadPreference();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPreference() async {
     final visible = await _preferences.getIntroVisible();
+    final storedName = await _preferences.getUserName();
     if (!mounted) return;
-    setState(() => _showIntroMessage = visible);
+    setState(() {
+      _showIntroMessage = visible;
+      _nameController.text = storedName;
+    });
   }
 
   @override
@@ -84,7 +96,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
+                    TextField(
+                      controller: _nameController,
+                      textAlign: TextAlign.center,
+                      decoration: InputDecoration(
+                        labelText: 'Tu nombre',
+                        hintText: 'Escribe cómo quieres identificarte',
+                        labelStyle: const TextStyle(color: Color(0xFF4E6C93)),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
@@ -101,12 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const MenuScreen()),
-                        );
-                      },
+                      onPressed: _handleStart,
                       child: const Text('Comenzar'),
                     ),
                     const SizedBox(height: 28),
@@ -126,6 +149,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _handleStart() async {
+    final name = _nameController.text.trim().isEmpty
+        ? 'anonymous'
+        : _nameController.text.trim();
+    await _preferences.setUserName(name);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MenuScreen()),
     );
   }
 }

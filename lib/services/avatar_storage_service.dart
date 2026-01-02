@@ -10,6 +10,7 @@ class AvatarStorageService {
 
   Future<File> _getFile() async {
     final dir = await getApplicationDocumentsDirectory();
+    await dir.create(recursive: true);
     return File('${dir.path}/$_fileName');
   }
 
@@ -26,6 +27,6 @@ class AvatarStorageService {
 
   Future<void> saveProfile(AvatarProfile profile) async {
     final file = await _getFile();
-    await file.writeAsString(jsonEncode(profile.toJson()));
+    await file.writeAsString(jsonEncode(profile.toJson()), flush: true);
   }
 }

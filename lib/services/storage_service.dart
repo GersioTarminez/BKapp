@@ -10,6 +10,7 @@ class StorageService {
 
   Future<File> _getLocalFile() async {
     final directory = await getApplicationDocumentsDirectory();
+    await directory.create(recursive: true);
     return File('${directory.path}/$_fileName');
   }
 
@@ -37,7 +38,7 @@ class StorageService {
   Future<void> saveEntries(List<EmotionEntry> entries) async {
     final file = await _getLocalFile();
     final serialized = jsonEncode(entries.map((e) => e.toJson()).toList());
-    await file.writeAsString(serialized);
+    await file.writeAsString(serialized, flush: true);
   }
 
   Future<void> addEntry(EmotionEntry entry) async {

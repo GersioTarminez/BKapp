@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/experience_flags_service.dart';
-import '../services/session_stats_service.dart';
+import '../services/session_log_service.dart';
 import '../services/sound_service.dart';
 import 'bubble_calm_controller.dart';
 
@@ -16,14 +16,14 @@ class BubbleCalmScreen extends StatefulWidget {
 class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
   final BubbleCalmController _controller = BubbleCalmController();
   final ExperienceFlagsService _flags = ExperienceFlagsService.instance;
-  final SessionStatsService _stats = SessionStatsService.instance;
+  final SessionLogService _sessionLog = SessionLogService.instance;
   Timer? _timer;
   bool _currentTapHitBubble = false;
 
   @override
   void initState() {
     super.initState();
-    _stats.startSession();
+    _sessionLog.startBubbleSession();
     _timer = Timer.periodic(const Duration(milliseconds: 30), (_) {
       setState(_controller.tick);
     });
@@ -35,7 +35,7 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    _stats.endSession();
+    unawaited(_sessionLog.endBubbleSession());
     super.dispose();
   }
 
@@ -85,7 +85,7 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
           _currentTapHitBubble = false;
           Future.microtask(() {
             if (!_currentTapHitBubble) {
-              _stats.recordMiss();
+              _sessionLog.recordBubbleMiss();
             }
           });
         },
@@ -129,7 +129,7 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
                   child: GestureDetector(
                     onTap: () {
                       _currentTapHitBubble = true;
-                      _stats.recordPop();
+                      _sessionLog.recordBubblePop();
                       setState(() {
                         _controller.explode(burbuja);
                         SoundService.instance.playBubblePop();
@@ -187,7 +187,8 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
   }
 
   Future<void> _showSessionInfo() async {
-    final sessions = await _stats.loadSessions();
+    final sessions =
+        await _sessionLog.loadSessions(game: SessionGame.bubbleCalm);
     if (!mounted) return;
     showModalBottomSheet<void>(
       context: context,
@@ -203,6 +204,8 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
           itemCount: sessions.length,
           itemBuilder: (context, index) {
             final session = sessions[sessions.length - 1 - index];
+            final metrics = session.metrics;
+            final mean = metrics['mean_tap_interval_ms'] as num?;
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
@@ -211,7 +214,7 @@ class _BubbleCalmScreenState extends State<BubbleCalmScreen> {
                   style: const TextStyle(fontSize: 14),
                 ),
                 subtitle: Text(
-                  'Burbujas: ${session.bubblesPopped} • Fallos: ${session.missedTaps}\nPromedio toque: ${session.meanIntervalMs?.toStringAsFixed(1) ?? '-'} ms',
+                  'Burbujas: ${metrics['bubbles_popped'] ?? 0} • Fallos: ${metrics['missed_taps'] ?? 0}\nPromedio toque: ${mean == null ? '-' : mean.toStringAsFixed(1)} ms',
                 ),
               ),
             );

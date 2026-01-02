@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../models/garden_plant.dart';
 import '../services/experience_flags_service.dart';
 import '../services/garden_storage_service.dart';
-import '../services/session_stats_service.dart';
+import '../services/session_log_service.dart';
 
 class SeedGardenScreen extends StatefulWidget {
   const SeedGardenScreen({super.key});
@@ -24,7 +24,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   static const List<String> _calmTreeTypes = ['Green', 'Blue', 'Yellow', 'Red', 'White'];
   final GardenStorageService _gardenStorage = GardenStorageService();
   final ExperienceFlagsService _flags = ExperienceFlagsService.instance;
-  final SessionStatsService _stats = SessionStatsService.instance;
+  final SessionLogService _sessionLog = SessionLogService.instance;
   _VegetationMode _mode = _VegetationMode.tree;
   _WeatherType _weather = _WeatherType.sunny;
   late _GardenMap _gardenMap;
@@ -40,7 +40,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   @override
   void initState() {
     super.initState();
-    _stats.startGardenSession();
+    _sessionLog.startGardenSession();
     _gardenMap = _generateMap();
     _animalController = AnimationController(
       vsync: this,
@@ -195,7 +195,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
             .clamp(0.0, 1.0);
         if (!tree.hasMatured && tree.growth >= 2 / 3) {
           tree.hasMatured = true;
-          _stats.recordTreeMatured();
+          _sessionLog.recordTreeMatured();
         }
         updated = true;
       }
@@ -257,7 +257,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       );
       _refreshCalmMessage();
     });
-    _stats.recordSeedPlanted();
+    _sessionLog.recordTreePlanted();
     _scheduleSave();
   }
 
@@ -280,7 +280,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       );
       _refreshCalmMessage();
     });
-    _stats.recordFlowerPlanted();
+    _sessionLog.recordFlowerPlanted();
   }
 
   void _refreshCalmMessage() {
@@ -441,7 +441,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
     _saveDebounce?.cancel();
     unawaited(_persistGarden());
     _animalController.dispose();
-    unawaited(_stats.endGardenSession());
+    unawaited(_sessionLog.endGardenSession());
     super.dispose();
   }
 

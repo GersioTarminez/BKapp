@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../minigames/bubble_calm_screen.dart';
 import '../minigames/seed_garden_screen.dart';
 import '../minigames/star_path_screen.dart';
+import 'emotions_screen.dart';
 import 'other_activities_screen.dart';
 
 class MenuScreen extends StatelessWidget {
@@ -40,6 +41,16 @@ class MenuScreen extends StatelessWidget {
           Color(0xFF5EC08E),
         ],
         icon: Icons.grass,
+      ),
+      _MenuItem(
+        title: 'Modo Emociones',
+        subtitle: 'Elige cómo te sientes hoy',
+        builder: () => const EmotionsScreen(),
+        gradient: const [
+          Color(0xFFFFB5DE),
+          Color(0xFFFED4E8),
+        ],
+        icon: Icons.emoji_emotions,
       ),
     ];
 

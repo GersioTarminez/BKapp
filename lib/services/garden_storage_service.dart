@@ -11,6 +11,7 @@ class GardenStorageService {
 
   Future<File> _getFile() async {
     final dir = await getApplicationDocumentsDirectory();
+    await dir.create(recursive: true);
     return File('${dir.path}/$_fileName');
   }
 
@@ -30,6 +31,6 @@ class GardenStorageService {
   Future<void> saveGarden(List<GardenPlant> plants) async {
     final file = await _getFile();
     final data = plants.map((e) => e.toJson()).toList();
-    await file.writeAsString(jsonEncode(data));
+    await file.writeAsString(jsonEncode(data), flush: true);
   }
 }

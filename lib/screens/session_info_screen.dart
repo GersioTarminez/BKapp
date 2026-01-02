@@ -1,17 +1,24 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../services/session_stats_service.dart';
+import '../services/drawing_storage_service.dart';
+import '../services/export_service.dart';
+import '../services/session_log_service.dart';
 
 class SessionInfoScreen extends StatelessWidget {
   const SessionInfoScreen({super.key});
 
   Future<_SessionData> _loadAllSessions() async {
-    final service = SessionStatsService.instance;
-    final bubbles = await service.loadSessions();
-    final garden = await service.loadGardenSessions();
+    final service = SessionLogService.instance;
+    final bubbles = await service.loadSessions(game: SessionGame.bubbleCalm);
+    final garden = await service.loadSessions(game: SessionGame.seedGarden);
+    final starPaths = await DrawingStorageService.instance.loadStarPathRecords();
     return _SessionData(
       bubbles: bubbles,
       garden: garden,
+      starPaths: starPaths,
     );
   }
 
@@ -22,6 +29,13 @@ class SessionInfoScreen extends StatelessWidget {
         title: const Text('Información de sesión'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            onPressed: () => _openExportSheet(context),
+            icon: const Icon(Icons.download),
+            tooltip: 'Exportar sesiones',
+          ),
+        ],
       ),
       body: FutureBuilder<_SessionData>(
         future: _loadAllSessions(),
@@ -32,12 +46,13 @@ class SessionInfoScreen extends StatelessWidget {
           final data = snapshot.data ?? const _SessionData();
           final bubbles = data.bubbles;
           final garden = data.garden;
-          if (bubbles.isEmpty && garden.isEmpty) {
+          final starPaths = data.starPaths;
+          if (bubbles.isEmpty && garden.isEmpty && starPaths.isEmpty) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'Todavía no hay sesiones guardadas. Juega y cuida el jardín para comenzar a registrar tus datos.',
+                  'Todavía no hay sesiones guardadas. Crea caminos de estrellas o juega a los minijuegos para registrar datos.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18,
@@ -64,12 +79,67 @@ class SessionInfoScreen extends StatelessWidget {
                 ...garden
                     .reversed
                     .map((session) => _GardenSessionCard(session: session)),
+                const SizedBox(height: 24),
+              ],
+              if (starPaths.isNotEmpty) ...[
+                const _SectionHeader('Camino de Estrellas'),
+                const SizedBox(height: 12),
+                ...starPaths.map((record) => _StarPathRecordCard(record: record)),
               ],
             ],
           );
         },
       ),
     );
+  }
+
+  Future<void> _openExportSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.table_view),
+                title: const Text('Exportar como XLSX'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _exportSessions(context: context, asXlsx: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.description),
+                title: const Text('Exportar como CSV'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _exportSessions(context: context, asXlsx: false);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _exportSessions({
+    required BuildContext context,
+    required bool asXlsx,
+  }) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+    try {
+      await ExportService.instance.exportSessions(asXlsx: asXlsx);
+    } finally {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
   }
 }
 
@@ -94,10 +164,12 @@ class _SectionHeader extends StatelessWidget {
 class _BubbleSessionCard extends StatelessWidget {
   const _BubbleSessionCard({required this.session});
 
-  final BubbleSessionSummary session;
+  final SessionRecord session;
 
   @override
   Widget build(BuildContext context) {
+    final metrics = session.metrics;
+    final mean = metrics['mean_tap_interval_ms'] as num?;
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -121,19 +193,25 @@ class _BubbleSessionCard extends StatelessWidget {
               children: [
                 _MetricChip(
                   label: 'Burbujas',
-                  value: session.bubblesPopped.toString(),
+                  value: '${metrics['bubbles_popped'] ?? 0}',
                 ),
                 _MetricChip(
                   label: 'Fallos',
-                  value: session.missedTaps.toString(),
+                  value: '${metrics['missed_taps'] ?? 0}',
                 ),
                 _MetricChip(
                   label: 'Velocidad',
-                  value: session.meanIntervalMs == null
-                      ? '-'
-                      : '${session.meanIntervalMs!.toStringAsFixed(0)} ms',
+                  value: mean == null ? '-' : '${mean.toStringAsFixed(0)} ms',
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Usuario: ${session.userName}',
+              style: const TextStyle(
+                color: Color(0xFF6B7C9C),
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -145,10 +223,11 @@ class _BubbleSessionCard extends StatelessWidget {
 class _GardenSessionCard extends StatelessWidget {
   const _GardenSessionCard({required this.session});
 
-  final GardenSessionSummary session;
+  final SessionRecord session;
 
   @override
   Widget build(BuildContext context) {
+    final metrics = session.metrics;
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -172,17 +251,25 @@ class _GardenSessionCard extends StatelessWidget {
               children: [
                 _MetricChip(
                   label: 'Árboles',
-                  value: session.treesPlanted.toString(),
+                  value: '${metrics['trees_planted'] ?? 0}',
                 ),
                 _MetricChip(
                   label: 'Flores',
-                  value: session.flowersPlanted.toString(),
+                  value: '${metrics['flowers_planted'] ?? 0}',
                 ),
                 _MetricChip(
                   label: 'Tiempo',
                   value: _formatDuration(session.durationSeconds),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Usuario: ${session.userName}',
+              style: const TextStyle(
+                color: Color(0xFF4E6C93),
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -198,6 +285,114 @@ class _GardenSessionCard extends StatelessWidget {
       return '$remaining s';
     }
     return '${minutes}m ${remaining.toString().padLeft(2, '0')}s';
+  }
+}
+
+class _StarPathRecordCard extends StatelessWidget {
+  const _StarPathRecordCard({required this.record});
+
+  final StarPathRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMemoryThumb =
+        record.thumbnailBytes != null && record.thumbnailBytes!.isNotEmpty;
+    final File? thumbnailFile = (!kIsWeb && record.thumbnailPath.isNotEmpty)
+        ? File(record.thumbnailPath)
+        : null;
+    final hasThumbnailFile =
+        thumbnailFile != null && thumbnailFile.existsSync();
+    final metrics = record.metrics;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: hasMemoryThumb
+                  ? Image.memory(
+                      record.thumbnailBytes!,
+                      width: 110,
+                      height: 110,
+                      fit: BoxFit.cover,
+                    )
+                  : hasThumbnailFile
+                      ? Image.file(
+                          thumbnailFile!,
+                          width: 110,
+                          height: 110,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          width: 110,
+                          height: 110,
+                          color: const Color(0xFFE0E6FF),
+                          child: const Icon(Icons.broken_image,
+                              color: Color(0xFF5C6CA8)),
+                        ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  record.word ?? 'Modo libre',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2D3E66),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Usuario: ${record.userName}',
+                  style: const TextStyle(
+                    color: Color(0xFF6F82A4),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Sesión ${record.savedAt.toLocal()}',
+                  style: const TextStyle(
+                    color: Color(0xFF7A8DAA),
+                    fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
+                    children: [
+                      _MetricChip(
+                        label: 'Estrellas',
+                        value:
+                            '${metrics['stars_placed_count'] ?? '-'}',
+                      ),
+                      _MetricChip(
+                        label: 'Longitud',
+                        value:
+                            (metrics['path_length_total'] as num?)
+                                    ?.toStringAsFixed(1) ??
+                                '-',
+                      ),
+                      _MetricChip(
+                        label: 'Modo',
+                        value: record.mode.toUpperCase(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -243,8 +438,10 @@ class _SessionData {
   const _SessionData({
     this.bubbles = const [],
     this.garden = const [],
+    this.starPaths = const [],
   });
 
-  final List<BubbleSessionSummary> bubbles;
-  final List<GardenSessionSummary> garden;
+  final List<SessionRecord> bubbles;
+  final List<SessionRecord> garden;
+  final List<StarPathRecord> starPaths;
 }
