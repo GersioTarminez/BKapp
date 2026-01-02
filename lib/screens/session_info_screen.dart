@@ -7,8 +7,15 @@ import '../services/drawing_storage_service.dart';
 import '../services/export_service.dart';
 import '../services/session_log_service.dart';
 
-class SessionInfoScreen extends StatelessWidget {
+class SessionInfoScreen extends StatefulWidget {
   const SessionInfoScreen({super.key});
+
+  @override
+  State<SessionInfoScreen> createState() => _SessionInfoScreenState();
+}
+
+class _SessionInfoScreenState extends State<SessionInfoScreen> {
+  bool _isTxtExporting = false;
 
   Future<_SessionData> _loadAllSessions() async {
     final service = SessionLogService.instance;
@@ -62,30 +69,63 @@ class SessionInfoScreen extends StatelessWidget {
               ),
             );
           }
-          return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          return Column(
             children: [
-              if (bubbles.isNotEmpty) ...[
-                const _SectionHeader('Calma de Burbujas'),
-                const SizedBox(height: 12),
-                ...bubbles
-                    .reversed
-                    .map((session) => _BubbleSessionCard(session: session)),
-                const SizedBox(height: 24),
-              ],
-              if (garden.isNotEmpty) ...[
-                const _SectionHeader('Jardín de Semillas'),
-                const SizedBox(height: 12),
-                ...garden
-                    .reversed
-                    .map((session) => _GardenSessionCard(session: session)),
-                const SizedBox(height: 24),
-              ],
-              if (starPaths.isNotEmpty) ...[
-                const _SectionHeader('Camino de Estrellas'),
-                const SizedBox(height: 12),
-                ...starPaths.map((record) => _StarPathRecordCard(record: record)),
-              ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Builder(builder: (buttonContext) {
+                    return ElevatedButton.icon(
+                      onPressed: _isTxtExporting
+                          ? null
+                          : () => _exportSessionsTxt(buttonContext),
+                      icon: _isTxtExporting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.description_outlined),
+                      label: Text(
+                        _isTxtExporting
+                            ? 'Exportando...'
+                            : 'Exportar sesiones (.txt)',
+                      ),
+                    );
+                  }),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  children: [
+                    if (bubbles.isNotEmpty) ...[
+                      const _SectionHeader('Calma de Burbujas'),
+                      const SizedBox(height: 12),
+                      ...bubbles
+                          .reversed
+                          .map((session) => _BubbleSessionCard(session: session)),
+                      const SizedBox(height: 24),
+                    ],
+                    if (garden.isNotEmpty) ...[
+                      const _SectionHeader('Jardín de Semillas'),
+                      const SizedBox(height: 12),
+                      ...garden
+                          .reversed
+                          .map((session) => _GardenSessionCard(session: session)),
+                      const SizedBox(height: 24),
+                    ],
+                    if (starPaths.isNotEmpty) ...[
+                      const _SectionHeader('Camino de Estrellas'),
+                      const SizedBox(height: 12),
+                      ...starPaths
+                          .map((record) => _StarPathRecordCard(record: record)),
+                    ],
+                  ],
+                ),
+              ),
             ],
           );
         },
@@ -139,6 +179,40 @@ class SessionInfoScreen extends StatelessWidget {
       await ExportService.instance.exportSessions(asXlsx: asXlsx);
     } finally {
       Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  Future<void> _exportSessionsTxt(BuildContext context) async {
+    if (_isTxtExporting) return;
+    setState(() => _isTxtExporting = true);
+    String? errorMessage;
+    Rect? shareOrigin;
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      if (box != null) {
+        final offset = box.localToGlobal(Offset.zero);
+        shareOrigin = offset & box.size;
+      }
+    } catch (_) {}
+    try {
+      await ExportService.instance.exportSessionsTxt(
+        shareOrigin: shareOrigin,
+      );
+    } catch (error, stack) {
+      errorMessage = 'No se pudo exportar la sesión.';
+      debugPrint('TXT EXPORT ERROR: $error');
+      debugPrint('$stack');
+    } finally {
+      if (mounted) {
+        setState(() => _isTxtExporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errorMessage ?? 'Archivo .txt generado.',
+            ),
+          ),
+        );
+      }
     }
   }
 }

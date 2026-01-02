@@ -3,12 +3,16 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Rect;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'drawing_storage_service.dart';
+import 'session_log_service.dart';
+import '../utils/txt_file_downloader.dart';
 
 class ExportService {
   ExportService._();
@@ -133,6 +137,104 @@ class ExportService {
         text: 'Sesiones exportadas desde BrisaKids.',
         subject: 'Exportación de sesiones BrisaKids',
       );
+    }
+  }
+
+  Future<void> exportSessionsTxt({Rect? shareOrigin}) async {
+    final sessionLog = SessionLogService.instance;
+    final sessions = await sessionLog.loadSessions();
+    final drawings =
+        await DrawingStorageService.instance.loadStarPathRecords();
+    final drawingsBySession = <String, List<StarPathRecord>>{};
+    for (final record in drawings) {
+      drawingsBySession.putIfAbsent(record.sessionId, () => []).add(record);
+    }
+    final buffer = StringBuffer();
+    for (final session in sessions) {
+      final starRecords = drawingsBySession[session.id] ?? const [];
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('SESSION: ${session.id}');
+      buffer.writeln('USER: ${session.userName}');
+      buffer.writeln('START: ${session.startedAt.toIso8601String()}');
+      buffer.writeln('END: ${session.endedAt.toIso8601String()}');
+      buffer.writeln('DURATION_SEC: ${session.durationSeconds}');
+      buffer.writeln();
+      buffer.writeln('BUBBLE_CALM:');
+      if (session.game == SessionGame.bubbleCalm) {
+        buffer.writeln('  bubbles_popped: ${session.metrics['bubbles_popped'] ?? 0}');
+        buffer.writeln('  missed_taps: ${session.metrics['missed_taps'] ?? 0}');
+        buffer.writeln(
+            '  mean_tap_interval_ms: ${session.metrics['mean_tap_interval_ms'] ?? '-'}');
+      } else {
+        buffer.writeln('  bubbles_popped: -');
+        buffer.writeln('  missed_taps: -');
+        buffer.writeln('  mean_tap_interval_ms: -');
+      }
+      buffer.writeln();
+      buffer.writeln('STAR_PATH:');
+      buffer.writeln('  saved_drawing_count: ${starRecords.length}');
+      if (starRecords.isEmpty) {
+        buffer.writeln('  drawings:');
+      } else {
+        buffer.writeln('  drawings:');
+        for (final record in starRecords) {
+          final reference = record.imagePath.isNotEmpty
+              ? p.basename(record.imagePath)
+              : 'inline_drawing';
+          buffer.writeln(
+              '    - mode: ${record.mode} word: ${record.word ?? ''} file: $reference');
+        }
+      }
+      buffer.writeln();
+      buffer.writeln('SEED_GARDEN:');
+      if (session.game == SessionGame.seedGarden) {
+        buffer.writeln('  trees_planted: ${session.metrics['trees_planted'] ?? 0}');
+        buffer.writeln('  flowers_planted: ${session.metrics['flowers_planted'] ?? 0}');
+        buffer.writeln('  trees_matured: ${session.metrics['trees_matured'] ?? 0}');
+      } else {
+        buffer.writeln('  trees_planted: -');
+        buffer.writeln('  flowers_planted: -');
+        buffer.writeln('  trees_matured: -');
+      }
+      buffer.writeln();
+    }
+    buffer.writeln('----------------------------------------');
+
+    final now = DateTime.now();
+    final timestamp =
+        '${now.year.toString().padLeft(4, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+    final fileName = 'sessions_$timestamp.txt';
+    final contents = buffer.toString();
+
+    if (kIsWeb) {
+      await downloadTxtFile(fileName, contents);
+      return;
+    }
+
+    final docsDir = await getApplicationDocumentsDirectory();
+    final file = File('${docsDir.path}/$fileName');
+    try {
+      await file.writeAsString(contents, flush: true);
+      final exists = await file.exists();
+      if (!exists) {
+        throw Exception('TXT file was not created');
+      }
+      await Share.shareXFiles(
+        [
+          XFile(
+            file.path,
+            mimeType: 'text/plain',
+          ),
+        ],
+        text: 'Sesiones exportadas (.txt) desde BrisaKids.',
+        subject: 'Exportación de sesiones - TXT',
+        sharePositionOrigin: shareOrigin,
+      );
+    } catch (error, stack) {
+      debugPrint('EXPORT FAILED: $error');
+      debugPrint('$stack');
+      debugPrint('PATH: ${file.path}');
+      rethrow;
     }
   }
 
