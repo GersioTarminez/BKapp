@@ -181,9 +181,18 @@ class ExportService {
           final reference = record.imagePath.isNotEmpty
               ? p.basename(record.imagePath)
               : 'inline_drawing';
-          buffer.writeln(
-              '    - mode: ${record.mode} word: ${record.word ?? ''} file: $reference');
+      buffer.writeln(
+          '    - mode: ${record.mode} word: ${record.word ?? ''} file: $reference');
         }
+      }
+      buffer.writeln();
+      buffer.writeln('EMOCIONES:');
+      if (session.game == SessionGame.emotions) {
+        buffer.writeln('  emotion: ${session.metrics['emotion'] ?? '-'}');
+        buffer.writeln('  note: ${session.metrics['note'] ?? ''}');
+      } else {
+        buffer.writeln('  emotion: -');
+        buffer.writeln('  note: -');
       }
       buffer.writeln();
       buffer.writeln('SEED_GARDEN:');

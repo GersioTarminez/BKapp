@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'preferences_service.dart';
 
-enum SessionGame { bubbleCalm, seedGarden }
+enum SessionGame { bubbleCalm, seedGarden, emotions }
 
 class SessionRecord {
   SessionRecord({
@@ -160,6 +160,26 @@ class SessionLogService {
     );
     await _persist(record);
     _gardenSession = null;
+  }
+
+  Future<void> logEmotionEntry({
+    required String emotion,
+    String? note,
+  }) async {
+    final now = DateTime.now();
+    final record = SessionRecord(
+      id: _newId(),
+      game: SessionGame.emotions,
+      startedAt: now,
+      endedAt: now,
+      durationSeconds: 0,
+      metrics: {
+        'emotion': emotion,
+        'note': note,
+      }..removeWhere((key, value) => value == null || (value is String && value.isEmpty)),
+      userName: PreferencesService.instance.cachedUserName,
+    );
+    await _persist(record);
   }
 
   Future<List<SessionRecord>> loadSessions({SessionGame? game}) async {

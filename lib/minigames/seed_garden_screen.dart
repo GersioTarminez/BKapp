@@ -34,8 +34,116 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   Timer? _growthTimer;
   Timer? _saveDebounce;
   int _counter = 0;
-  String _calmMessage = 'Toca en cualquier lugar para hacer crecer tu bosque tranquilo.';
+  String _calmMessage =
+      'Toca en cualquier lugar para hacer crecer tu bosque tranquilo.';
+  String _npcLine =
+      'Hola, soy Mike el jardinero. ¿Listo para jugar con las plantas?';
+  _NpcMoodOption? _activeMood;
+  final List<_NpcMoodOption> _npcMoods = [
+    _NpcMoodOption(
+      label: '😀 Alegre',
+      builder: (trees) {
+        if (trees == 0) {
+          return 'Parece que el jardín está un poco vacío, pero tu alegría llenará pronto este lugar.';
+        }
+        if (trees < 3) {
+          return '¡Gracias por sonreír! Estos $trees arbolitos se contagian de tu ánimo.';
+        }
+        return 'Qué felicidad ver un jardín con $trees árboles brillando contigo.';
+      },
+    ),
+    _NpcMoodOption(
+      label: '😍 Muy feliz',
+      builder: (trees) {
+        if (trees == 0) {
+          return 'Incluso sin árboles, tu entusiasmo me hace creer que será hermoso.';
+        }
+        return '¡Esto parece un jardín mágico con $trees árboles! Gracias por hacerlo tan especial.';
+      },
+    ),
+    _NpcMoodOption(
+      label: '😟 Tranquilo',
+      builder: (trees) {
+        if (trees == 0) {
+          return 'Parece que el jardín está un poco vacío, pero podemos empezar juntos cuando quieras.';
+        }
+        return 'Respiremos hondo; cuidaremos los $trees árboles con paciencia y cariño.';
+      },
+    ),
+    _NpcMoodOption(
+      label: '😠 Molesto',
+      builder: (trees) {
+        if (trees == 0) {
+          return 'Aunque esté vacío, ayudarme a plantar aliviará esa molestia paso a paso.';
+        }
+        return 'Transformemos ese enfado cuidando los $trees árboles con calma.';
+      },
+    ),
+  ];
+  final List<_SpecialAnimal> _specialAnimals = [];
+  final List<_FriendPerson> _friendPeople = [];
+  final Set<int> _unlockedThresholds = {};
+  final List<int> _milestoneThresholds =
+      const [0, 5, 10, 20, 30, 50, 60, 70, 80, 90, 100];
+  final Map<int, String> _milestoneMessages = const {
+    0: 'Mike te acompaña incluso cuando el jardín está vacío.',
+    5: 'Las primeras raíces despiertan a nuevos amigos.',
+    10: 'Diez árboles llenan el aire de historias tranquilas.',
+    20: 'Veinte árboles hacen que el bosque cante en voz baja.',
+    30: 'Treinta árboles crean un refugio muy especial.',
+    50: 'Cincuenta árboles convierten este jardín en un bosque mágico.',
+  };
+  final Map<int, _AnimalSpec> _baseAnimalRewards = {
+    0: _AnimalSpec('Conejito suave', _SpecialAnimalType.bunny, Color(0xFFF8D3DC)),
+    5: _AnimalSpec('Ardilla brillante', _SpecialAnimalType.squirrel, Color(0xFFE0B985)),
+    10: _AnimalSpec('Zorro amistoso', _SpecialAnimalType.fox, Color(0xFFFFA07A)),
+    20: _AnimalSpec('Búho soñador', _SpecialAnimalType.owl, Color(0xFF8FA5C2)),
+    30: _AnimalSpec('Pez rosa', _SpecialAnimalType.pinkFish, Color(0xFFE8B0FF)),
+    50: _AnimalSpec('Mariposa lunar', _SpecialAnimalType.butterfly, Color(0xFFB3E5FC)),
+  };
+  final List<_AnimalSpec> _postFiftyAnimals = const [
+    _AnimalSpec('Serpiente pequeña', _SpecialAnimalType.smallSnake, Color(0xFF81C784)),
+    _AnimalSpec('Pez rosa', _SpecialAnimalType.pinkFish, Color(0xFFE8B0FF)),
+    _AnimalSpec('Mariposa lunar', _SpecialAnimalType.butterfly, Color(0xFFB3E5FC)),
+  ];
+  final List<_PersonSpec> _personOptions = const [
+    _PersonSpec('Peque aventurero', _PersonType.childExplorer),
+    _PersonSpec('Amiga soñadora', _PersonType.dreamer),
+    _PersonSpec('Cuidadora serena', _PersonType.caretaker),
+  ];
+
+  List<_AnimalSpec> get _manualAnimalOptions {
+    final seen = <_SpecialAnimalType>{};
+    final list = <_AnimalSpec>[];
+    for (final spec in [
+      ..._baseAnimalRewards.values,
+      ..._postFiftyAnimals,
+    ]) {
+      if (seen.add(spec.type)) {
+        list.add(spec);
+      }
+    }
+    return list;
+  }
+
+  List<_FriendPaletteEntry> get _friendPaletteOptions {
+    final entries = <_FriendPaletteEntry>[];
+    for (final animal in _manualAnimalOptions) {
+      entries.add(_FriendPaletteEntry(animalSpec: animal));
+    }
+    for (final person in _personOptions) {
+      entries.add(_FriendPaletteEntry(personSpec: person));
+    }
+    return entries;
+  }
+  int _postFiftyIndex = 0;
+  int _highestMilestone = 0;
+  bool _creativeUnlocked = false;
+  String? _toastMessage;
+  Timer? _toastTimer;
   Size _gardenSize = Size.zero;
+  _FriendPaletteEntry? _selectedFriendEntry;
+  bool _isEraserMode = false;
 
   @override
   void initState() {
@@ -53,6 +161,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       _updateGrowth();
     });
     _loadGarden();
+    _checkMilestones(quietly: true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeShowTip();
     });
@@ -183,6 +292,8 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       _refreshCalmMessage();
     });
     _pendingPlants.clear();
+    _checkMilestones(quietly: true);
+    _maybeUnlockCreative(quietly: true);
   }
 
   void _updateGrowth() {
@@ -210,6 +321,14 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
 
   void _handleTap(TapDownDetails details) {
     final position = _calculateTapPosition(details);
+    if (_isEraserMode) {
+      _eraseAt(position);
+      return;
+    }
+    if (_creativeUnlocked && _selectedFriendEntry != null) {
+      _placeFriend(position);
+      return;
+    }
     switch (_mode) {
       case _VegetationMode.tree:
         _createTree(position);
@@ -218,6 +337,14 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
         _createFlower(position);
         break;
     }
+  }
+
+  void _changeMode(_VegetationMode mode) {
+    setState(() {
+      _mode = mode;
+      _selectedFriendEntry = null;
+      _isEraserMode = false;
+    });
   }
 
   Offset _calculateTapPosition(TapDownDetails details) {
@@ -257,8 +384,10 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       );
       _refreshCalmMessage();
     });
+    _checkMilestones();
     _sessionLog.recordTreePlanted();
     _scheduleSave();
+    _maybeUnlockCreative();
   }
 
   void _createFlower(Offset position) {
@@ -281,11 +410,139 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
       _refreshCalmMessage();
     });
     _sessionLog.recordFlowerPlanted();
+    _maybeUnlockCreative();
+  }
+
+  void _placeFriend(Offset position) {
+    final entry = _selectedFriendEntry;
+    if (entry == null) return;
+    final relative = _relativeFromAbsolute(position);
+    setState(() {
+      if (entry.isPerson) {
+        _friendPeople.add(
+          _FriendPerson(
+            spec: entry.personSpec!,
+            relativePosition: relative,
+            phaseOffset: _random.nextDouble() * 2 * pi,
+          ),
+        );
+      } else {
+        _specialAnimals.add(
+          _SpecialAnimal(
+            spec: entry.animalSpec!,
+            relativePosition: relative,
+            threshold: _highestMilestone,
+            isManual: true,
+            phaseOffset: _random.nextDouble() * 2 * pi,
+            amplitude: 6 + _random.nextDouble() * 4,
+          ),
+        );
+      }
+    });
+  }
+
+  void _eraseAt(Offset position) {
+    double? bestDistance;
+    VoidCallback? removeAction;
+
+    Offset? _recordRemoval(double distance, VoidCallback action) {
+      if (bestDistance == null || distance < bestDistance!) {
+        bestDistance = distance;
+        removeAction = action;
+      }
+      return null;
+    }
+
+    for (final tree in List<_Tree>.from(_trees)) {
+      final distance = (tree.position - position).distance;
+      if (distance < 70) {
+        _recordRemoval(distance, () {
+          _trees.remove(tree);
+          _refreshCalmMessage();
+          _scheduleSave();
+        });
+      }
+    }
+
+    for (final flower in List<_Flower>.from(_flowers)) {
+      final distance = (flower.position - position).distance;
+      if (distance < 50) {
+        _recordRemoval(distance, () {
+          _flowers.remove(flower);
+          _refreshCalmMessage();
+          _scheduleSave();
+        });
+      }
+    }
+
+    for (final friend in List<_SpecialAnimal>.from(_specialAnimals)) {
+      final absolute = _absoluteFromRelative(friend.relativePosition);
+      final distance = (absolute - position).distance;
+      if (distance < 60) {
+        _recordRemoval(distance, () {
+          _specialAnimals.remove(friend);
+        });
+      }
+    }
+
+    for (final person in List<_FriendPerson>.from(_friendPeople)) {
+      final absolute = _absoluteFromRelative(person.relativePosition);
+      final distance = (absolute - position).distance;
+      if (distance < 60) {
+        _recordRemoval(distance, () {
+          _friendPeople.remove(person);
+        });
+      }
+    }
+
+    if (removeAction != null) {
+      setState(() {
+        removeAction!.call();
+      });
+    }
+  }
+
+  Future<void> _confirmClearGarden() async {
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Limpiar jardín'),
+        content: const Text(
+            'Se eliminarán árboles, flores y amigos del jardín. ¿Deseas continuar?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Limpiar'),
+          ),
+        ],
+      ),
+    );
+    if (shouldClear != true) return;
+    setState(() {
+      _trees.clear();
+      _flowers.clear();
+      _specialAnimals.clear();
+      _friendPeople.clear();
+      _selectedFriendEntry = null;
+      _isEraserMode = false;
+      _unlockedThresholds
+        ..clear();
+      _highestMilestone = 0;
+      _creativeUnlocked = false;
+      _postFiftyIndex = 0;
+      _refreshCalmMessage();
+    });
+    _scheduleSave();
   }
 
   void _refreshCalmMessage() {
     if (_trees.isEmpty) {
       _calmMessage = 'Toca en cualquier lugar para hacer crecer tu bosque tranquilo.';
+      _npcLine = _baselineNpcLine(0);
       return;
     }
     final counts = _stageCounts();
@@ -313,6 +570,127 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
     _calmMessage = message.isEmpty
         ? 'Tu jardín está en silencio y espera nueva vida.'
         : '$message.';
+    if (_activeMood != null) {
+      _npcLine = _activeMood!.messageForTrees(_trees.length);
+    } else {
+      _npcLine = _baselineNpcLine(_trees.length);
+    }
+  }
+
+  double _plantScore() => _trees.length + (_flowers.length * 0.5);
+
+  void _maybeUnlockCreative({bool quietly = false}) {
+    if (_creativeUnlocked) return;
+    if (_plantScore() < 50) return;
+    setState(() {
+      _creativeUnlocked = true;
+    });
+    if (!quietly) {
+      _showToast(
+        '¡Has llegado a 50 puntos de jardín! Ahora puedes elegir qué amigos y personas acompañan tu bosque.',
+      );
+    }
+  }
+
+  String _baselineNpcLine(int totalTrees) {
+    if (totalTrees == 0) {
+      return 'Parece que el jardín está un poco vacío, ¿sembramos la primera semilla?';
+    }
+    if (totalTrees < 3) {
+      return 'Ya hay $totalTrees árbol${totalTrees == 1 ? '' : 'es'} saludando despacio.';
+    }
+    if (totalTrees < 6) {
+      return 'El jardín se siente vivo con estos $totalTrees árboles felices.';
+    }
+    return 'Vaya bosque sereno el que estás levantando aquí.';
+  }
+
+  void _checkMilestones({bool quietly = false}) {
+    final totalTrees = _trees.length;
+    final newAnimals = <_SpecialAnimal>[];
+    var unlockedSomething = false;
+    for (final threshold in _milestoneThresholds) {
+      if (totalTrees >= threshold &&
+          !_unlockedThresholds.contains(threshold)) {
+        _unlockedThresholds.add(threshold);
+        unlockedSomething = true;
+        final spec = _animalSpecForThreshold(threshold);
+        if (spec != null) {
+          newAnimals.add(
+            _SpecialAnimal(
+              spec: spec,
+              relativePosition: _randomAnimalSpot(),
+              threshold: threshold,
+              phaseOffset: _random.nextDouble() * 2 * pi,
+              amplitude: 5 + _random.nextDouble() * 4,
+              isManual: false,
+            ),
+          );
+        }
+      }
+    }
+
+    final newHighest = _unlockedThresholds.isEmpty
+        ? 0
+        : _unlockedThresholds.reduce(max);
+    if (!unlockedSomething && newHighest == _highestMilestone) {
+      return;
+    }
+    setState(() {
+      _specialAnimals.addAll(newAnimals);
+      _highestMilestone = newHighest;
+    });
+
+    if (!quietly && newAnimals.isNotEmpty) {
+      final unlocked = newAnimals.last;
+      final baseMessage = _milestoneMessages[unlocked.threshold] ??
+          'Has alcanzado $newHighest árboles.';
+      _showToast(
+        '$baseMessage ¡${unlocked.spec.displayName} ha llegado para quedarse!',
+      );
+    }
+  }
+
+  _AnimalSpec? _animalSpecForThreshold(int threshold) {
+    if (_baseAnimalRewards.containsKey(threshold)) {
+      return _baseAnimalRewards[threshold];
+    }
+    if (threshold >= 60 && threshold <= 100) {
+      final spec = _postFiftyAnimals[
+          _postFiftyIndex % _postFiftyAnimals.length];
+      _postFiftyIndex++;
+      return spec;
+    }
+    return null;
+  }
+
+  Offset _randomAnimalSpot() {
+    final dx = 0.15 + _random.nextDouble() * 0.7;
+    final dy = 0.45 + _random.nextDouble() * 0.4;
+    return Offset(dx.clamp(0.05, 0.95), dy.clamp(0.35, 0.95));
+  }
+
+  void _showToast(String message) {
+    _toastTimer?.cancel();
+    _toastTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _toastMessage = null;
+      });
+    });
+    setState(() {
+      _toastMessage = message;
+    });
+  }
+
+  void _handleMoodTap(_NpcMoodOption mood) {
+    setState(() {
+      for (final option in _npcMoods) {
+        option.isActive = option == mood;
+      }
+      _activeMood = mood;
+      _npcLine = mood.messageForTrees(_trees.length);
+    });
   }
 
   Map<String, int> _stageCounts() {
@@ -439,6 +817,7 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   void dispose() {
     _growthTimer?.cancel();
     _saveDebounce?.cancel();
+    _toastTimer?.cancel();
     unawaited(_persistGarden());
     _animalController.dispose();
     unawaited(_sessionLog.endGardenSession());
@@ -468,109 +847,191 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
 
   @override
   Widget build(BuildContext context) {
-    final stageCounts = _stageCounts();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Jardín de Semillas'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          _ModeSelector(
-            mode: _mode,
-            onModeChanged: (mode) {
-              setState(() => _mode = mode);
-            },
-          ),
-          _WeatherSelector(
-            weather: _weather,
-            onWeatherChanged: (weather) {
-              setState(() => _weather = weather);
-            },
-          ),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: _handleTap,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  _updateGardenSize(Size(constraints.maxWidth, constraints.maxHeight));
-                  return SizedBox(
-                    key: _gardenKey,
-                    width: constraints.maxWidth,
-                    height: constraints.maxHeight,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: DecoratedBox(
-                            decoration: const BoxDecoration(
-                              image: DecorationImage(
-                                image: AssetImage('assets/images/garden_bg.png'),
-                                repeat: ImageRepeat.repeat,
-                                opacity: 0.2,
+          Positioned.fill(
+            child: Column(
+              children: [
+                _ModeSelector(
+                  mode: _mode,
+                  onModeChanged: _changeMode,
+                ),
+                _WeatherSelector(
+                  weather: _weather,
+                  onWeatherChanged: (weather) {
+                    setState(() => _weather = weather);
+                  },
+                ),
+                _GardenToolsBar(
+                  isEraserActive: _isEraserMode,
+                  onToggleEraser: (value) {
+                    setState(() {
+                      _isEraserMode = value;
+                      if (value) {
+                        _selectedFriendEntry = null;
+                      }
+                    });
+                  },
+                  onClearGarden: _confirmClearGarden,
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: _handleTap,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        _updateGardenSize(
+                            Size(constraints.maxWidth, constraints.maxHeight));
+                        return SizedBox(
+                          key: _gardenKey,
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight,
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: const BoxDecoration(
+                                    image: DecorationImage(
+                                      image:
+                                          AssetImage('assets/images/garden_bg.png'),
+                                      repeat: ImageRepeat.repeat,
+                                      opacity: 0.2,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: _GardenPainter(
-                              map: _gardenMap,
-                              animalPhase: _animalController.value * 2 * pi,
-                              weather: _weather,
-                            ),
-                          ),
-                        ),
-                        ..._trees.map((tree) {
-                          return Positioned(
-                            left: tree.position.dx - 45,
-                            top: tree.position.dy - 130,
-                            child: SizedBox(
-                              width: 90,
-                              height: 140,
-                              child: _TreeGraphic(tree: tree),
-                            ),
-                          );
-                        }).toList(),
-                        ..._flowers.map((flower) {
-                          return Positioned(
-                            left: flower.position.dx - 10,
-                            top: flower.position.dy - 10,
-                            child: TweenAnimationBuilder<double>(
-                              key: ValueKey(flower.id),
-                              tween: Tween(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 400),
-                              builder: (context, value, child) {
-                                return Opacity(
-                                  opacity: value,
-                                  child: Transform.scale(
-                                    scale: value,
-                                    child: child,
+                              Positioned.fill(
+                                child: CustomPaint(
+                                  painter: _GardenPainter(
+                                    map: _gardenMap,
+                                    animalPhase: _animalController.value * 2 * pi,
+                                    weather: _weather,
+                                  ),
+                                ),
+                              ),
+                              ..._trees.map((tree) {
+                                return Positioned(
+                                  left: tree.position.dx - 45,
+                                  top: tree.position.dy - 130,
+                                  child: SizedBox(
+                                    width: 90,
+                                    height: 140,
+                                    child: _TreeGraphic(tree: tree),
                                   ),
                                 );
-                              },
-                              child: _FlowerDot(color: flower.color),
-                            ),
-                          );
-                        }).toList(),
-                      ],
+                              }).toList(),
+                              ..._flowers.map((flower) {
+                                return Positioned(
+                                  left: flower.position.dx - 10,
+                                  top: flower.position.dy - 10,
+                                  child: TweenAnimationBuilder<double>(
+                                    key: ValueKey(flower.id),
+                                    tween: Tween(begin: 0.0, end: 1.0),
+                                    duration: const Duration(milliseconds: 400),
+                                    builder: (context, value, child) {
+                                      return Opacity(
+                                        opacity: value,
+                                        child: Transform.scale(
+                                          scale: value,
+                                          child: child,
+                                        ),
+                                      );
+                                    },
+                                    child: _FlowerDot(color: flower.color),
+                                  ),
+                                );
+                              }).toList(),
+                              ..._buildSpecialAnimalWidgets(),
+                              ..._buildFriendPersonWidgets(),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
+                  ),
+                ),
+                if (_creativeUnlocked)
+                  _FriendPalette(
+                    options: _friendPaletteOptions,
+                    selected: _selectedFriendEntry,
+                    onOptionSelected: (entry) {
+                      setState(() {
+                        _selectedFriendEntry = entry;
+                        _isEraserMode = false;
+                      });
+                    },
+                  ),
+                _CalmPanel(
+                  message: _calmMessage,
+                  companionLine: _npcLine,
+                  moods: _npcMoods,
+                  onMoodSelected: _handleMoodTap,
+                  medalValue: _highestMilestone,
+                ),
+              ],
             ),
           ),
-          _CalmPanel(
-            message: _calmMessage,
-            seeds: stageCounts['seeds']!,
-            sprouts: stageCounts['sprouts']!,
-            grown: stageCounts['grown']!,
-            flowers: _flowers.length,
-          ),
+          if (_toastMessage != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: _ToastBanner(message: _toastMessage!),
+            ),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildSpecialAnimalWidgets() {
+    if (_specialAnimals.isEmpty) return const <Widget>[];
+    final wave = _animalController.value * 2 * pi;
+    return _specialAnimals.map((animal) {
+      final position = _gardenSize == Size.zero
+          ? Offset(150, 200)
+          : Offset(
+              animal.relativePosition.dx * _gardenSize.width,
+              animal.relativePosition.dy * _gardenSize.height,
+            );
+      final bob =
+          sin(wave + animal.phaseOffset) * animal.amplitude;
+      return Positioned(
+        left: position.dx - 27,
+        top: position.dy - 27,
+        child: _FriendAnimalChip(
+          spec: animal.spec,
+          bob: bob,
+        ),
+      );
+    }).toList();
+  }
+
+  List<Widget> _buildFriendPersonWidgets() {
+    if (_friendPeople.isEmpty) return const <Widget>[];
+    final wave = _animalController.value * 2 * pi;
+    return _friendPeople.map((person) {
+      final position = _gardenSize == Size.zero
+          ? Offset(150, 220)
+          : Offset(
+              person.relativePosition.dx * _gardenSize.width,
+              person.relativePosition.dy * _gardenSize.height,
+            );
+      final bob = sin(wave + person.phaseOffset) * 4;
+      return Positioned(
+        left: position.dx - 28,
+        top: position.dy - 40,
+        child: _FriendPersonWidget(
+          spec: person.spec,
+          bob: bob,
+        ),
+      );
+    }).toList();
   }
 }
 
@@ -686,20 +1147,63 @@ class _WeatherSelector extends StatelessWidget {
   }
 }
 
+class _GardenToolsBar extends StatelessWidget {
+  const _GardenToolsBar({
+    required this.isEraserActive,
+    required this.onToggleEraser,
+    required this.onClearGarden,
+  });
+
+  final bool isEraserActive;
+  final ValueChanged<bool> onToggleEraser;
+  final VoidCallback onClearGarden;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF9FAFE),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('Borrador'),
+            selected: isEraserActive,
+            onSelected: onToggleEraser,
+            selectedColor: const Color(0xFFFFD5D5),
+            backgroundColor: const Color(0xFFF1F2FA),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: onClearGarden,
+            icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+            label: const Text('Limpiar todo'),
+          ),
+          const Spacer(),
+          const Text(
+            'Disponible desde el inicio',
+            style: TextStyle(fontSize: 12, color: Color(0xFF6A788F)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CalmPanel extends StatelessWidget {
   const _CalmPanel({
     required this.message,
-    required this.seeds,
-    required this.sprouts,
-    required this.grown,
-    required this.flowers,
+    required this.companionLine,
+    required this.moods,
+    required this.onMoodSelected,
+    required this.medalValue,
   });
 
   final String message;
-  final int seeds;
-  final int sprouts;
-  final int grown;
-  final int flowers;
+  final String companionLine;
+  final List<_NpcMoodOption> moods;
+  final void Function(_NpcMoodOption) onMoodSelected;
+  final int medalValue;
 
   @override
   Widget build(BuildContext context) {
@@ -720,24 +1224,56 @@ class _CalmPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            message,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF4A6FA5),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _CalmStatChip(label: 'Semillas', value: seeds, emoji: '🫘'),
-              _CalmStatChip(label: 'Brotes', value: sprouts, emoji: '🌱'),
-              _CalmStatChip(label: 'Árboles', value: grown, emoji: '🌳'),
-              _CalmStatChip(label: 'Flores', value: flowers, emoji: '🌼'),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const _GardenerAvatar(),
+                  Positioned(
+                    right: -4,
+                    bottom: -4,
+                    child: _MedalBadge(value: medalValue),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      companionLine,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF4A6FA5),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF5F7D95),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            children: moods.map((mood) {
+              return ChoiceChip(
+                label: Text(mood.label),
+                selected: mood.isActive,
+                onSelected: (_) => onMoodSelected(mood),
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -745,34 +1281,735 @@ class _CalmPanel extends StatelessWidget {
   }
 }
 
-class _CalmStatChip extends StatelessWidget {
-  const _CalmStatChip({
-    required this.label,
-    required this.value,
-    required this.emoji,
-  });
-
-  final String label;
-  final int value;
-  final String emoji;
+class _GardenerAvatar extends StatelessWidget {
+  const _GardenerAvatar();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF4FF),
-        borderRadius: BorderRadius.circular(16),
+    return SizedBox(
+      width: 72,
+      height: 90,
+      child: CustomPaint(
+        painter: _GardenerPainter(),
       ),
-      child: Text(
-        '$emoji $label: $value',
-        style: const TextStyle(
-          color: Color(0xFF4A6FA5),
-          fontWeight: FontWeight.w600,
+    );
+  }
+}
+
+class _GardenerPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.width / 2;
+    final facePaint = Paint()..color = const Color(0xFFFFE7D3);
+    canvas.drawCircle(Offset(center, size.height * 0.35), size.width * 0.22, facePaint);
+
+    final hatPaint = Paint()..color = const Color(0xFFB6864B);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(center, size.height * 0.18),
+          width: size.width * 0.7,
+          height: size.height * 0.13,
+        ),
+        const Radius.circular(10),
+      ),
+      hatPaint,
+    );
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: Offset(center, size.height * 0.2),
+        width: size.width * 0.9,
+        height: size.height * 0.05,
+      ),
+      hatPaint,
+    );
+
+    final bodyPaint = Paint()..color = const Color(0xFF4A6FA5);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.25,
+          size.height * 0.5,
+          size.width * 0.5,
+          size.height * 0.4,
+        ),
+        const Radius.circular(12),
+      ),
+      bodyPaint,
+    );
+
+    final pocketPaint = Paint()..color = const Color(0xFFE3ECFF);
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: Offset(center, size.height * 0.7),
+        width: size.width * 0.3,
+        height: size.height * 0.2,
+      ),
+      pocketPaint,
+    );
+
+    final eyePaint = Paint()..color = const Color(0xFF4A6FA5);
+    canvas.drawCircle(Offset(center - 10, size.height * 0.34), 3, eyePaint);
+    canvas.drawCircle(Offset(center + 10, size.height * 0.34), 3, eyePaint);
+    final smile = Path()
+      ..moveTo(center - 10, size.height * 0.4)
+      ..quadraticBezierTo(
+          center, size.height * 0.45, center + 10, size.height * 0.4);
+    final smilePaint = Paint()
+      ..color = const Color(0xFF4A6FA5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawPath(smile, smilePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _MedalBadge extends StatelessWidget {
+  const _MedalBadge({required this.value});
+
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 250),
+      opacity: 1,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFE29A),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.emoji_events, size: 16, color: Color(0xFFAA7A00)),
+            const SizedBox(width: 4),
+            Text(
+              value.toString(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF7A5B00),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _ToastBanner extends StatelessWidget {
+  const _ToastBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 6,
+      borderRadius: BorderRadius.circular(16),
+      color: const Color(0xFF4A6FA5),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.pets, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SpecialAnimal {
+  _SpecialAnimal({
+    required this.spec,
+    required this.relativePosition,
+    required this.threshold,
+    required this.phaseOffset,
+    required this.amplitude,
+    this.isManual = false,
+  });
+
+  final _AnimalSpec spec;
+  final Offset relativePosition;
+  final int threshold;
+  final double phaseOffset;
+  final double amplitude;
+  final bool isManual;
+}
+
+class _FriendPerson {
+  _FriendPerson({
+    required this.spec,
+    required this.relativePosition,
+    required this.phaseOffset,
+  });
+
+  final _PersonSpec spec;
+  final Offset relativePosition;
+  final double phaseOffset;
+}
+
+class _AnimalSpec {
+  const _AnimalSpec(this.displayName, this.type, this.color);
+
+  final String displayName;
+  final _SpecialAnimalType type;
+  final Color color;
+}
+
+enum _SpecialAnimalType {
+  bunny,
+  squirrel,
+  fox,
+  owl,
+  pinkFish,
+  butterfly,
+  smallSnake,
+}
+
+class _FriendAnimalChip extends StatelessWidget {
+  const _FriendAnimalChip({required this.spec, required this.bob});
+
+  final _AnimalSpec spec;
+  final double bob;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: Offset(0, bob),
+      child: SizedBox(
+        width: 54,
+        height: 54,
+        child: CustomPaint(
+          painter: _AnimalSpritePainter(spec.type),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimalSpritePainter extends CustomPainter {
+  _AnimalSpritePainter(this.type);
+
+  final _SpecialAnimalType type;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    switch (type) {
+      case _SpecialAnimalType.bunny:
+        _drawBunny(canvas, size);
+        break;
+      case _SpecialAnimalType.squirrel:
+        _drawSquirrel(canvas, size);
+        break;
+      case _SpecialAnimalType.fox:
+        _drawFox(canvas, size);
+        break;
+      case _SpecialAnimalType.owl:
+        _drawOwl(canvas, size);
+        break;
+      case _SpecialAnimalType.pinkFish:
+        _drawPinkFish(canvas, size);
+        break;
+      case _SpecialAnimalType.butterfly:
+        _drawButterfly(canvas, size);
+        break;
+      case _SpecialAnimalType.smallSnake:
+        _drawSmallSnake(canvas, size);
+        break;
+    }
+  }
+
+  void _drawBunny(Canvas canvas, Size size) {
+    final body = Paint()..color = const Color(0xFFFFF6FB);
+    final ear = Paint()..color = const Color(0xFFF4D7E6);
+    final center = size.center(Offset.zero);
+    canvas.drawOval(
+      Rect.fromCenter(center: center.translate(0, 4), width: size.width * 0.8, height: size.height * 0.65),
+      body,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: center.translate(-8, -6), width: size.width * 0.25, height: size.height * 0.5),
+      ear,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: center.translate(8, -6), width: size.width * 0.25, height: size.height * 0.5),
+      ear,
+    );
+    canvas.drawCircle(center.translate(-6, -2), 3, Paint()..color = Colors.black54);
+    canvas.drawCircle(center.translate(6, -2), 3, Paint()..color = Colors.black54);
+    final nose = Path()
+      ..moveTo(center.dx, center.dy + 2)
+      ..lineTo(center.dx - 3, center.dy + 6)
+      ..lineTo(center.dx + 3, center.dy + 6)
+      ..close();
+    canvas.drawPath(nose, Paint()..color = const Color(0xFFE07A8C));
+  }
+
+  void _drawSquirrel(Canvas canvas, Size size) {
+    final body = Paint()..color = const Color(0xFFF5C392);
+    final tail = Paint()..color = const Color(0xFFF2A46F);
+    final center = size.center(Offset.zero);
+    canvas.drawOval(
+      Rect.fromCenter(center: center.translate(5, -2), width: size.width * 0.7, height: size.height * 0.6),
+      body,
+    );
+    canvas.drawCircle(center.translate(-10, 4), size.width * 0.35, tail);
+    final headCenter = center.translate(6, -10);
+    canvas.drawCircle(headCenter, size.width * 0.24, body);
+    final eyePaint = Paint()..color = const Color(0xFF4B3C35);
+    canvas.drawCircle(headCenter.translate(-6, -4), 3, eyePaint);
+    canvas.drawCircle(headCenter.translate(6, -4), 3, eyePaint);
+    final mouth = Path()
+      ..moveTo(headCenter.dx - 4, headCenter.dy + 6)
+      ..quadraticBezierTo(headCenter.dx, headCenter.dy + 10, headCenter.dx + 4, headCenter.dy + 6);
+    canvas.drawPath(
+      mouth,
+      Paint()
+        ..color = const Color(0xFF7A4C32)
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  void _drawFox(Canvas canvas, Size size) {
+    final orange = Paint()..color = const Color(0xFFFFB07C);
+    final white = Paint()..color = Colors.white;
+    final center = size.center(Offset.zero);
+    final bodyRect = Rect.fromCenter(center: center.translate(0, 5), width: size.width * 0.7, height: size.height * 0.55);
+    canvas.drawRRect(RRect.fromRectAndRadius(bodyRect, const Radius.circular(12)), orange);
+    final leftEar = Path()
+      ..moveTo(center.dx - 18, center.dy - 10)
+      ..lineTo(center.dx - 4, center.dy - 36)
+      ..lineTo(center.dx, center.dy - 8)
+      ..close();
+    canvas.drawPath(leftEar, orange);
+    final rightEar = Path()
+      ..moveTo(center.dx + 18, center.dy - 10)
+      ..lineTo(center.dx + 4, center.dy - 36)
+      ..lineTo(center.dx, center.dy - 8)
+      ..close();
+    canvas.drawPath(rightEar, orange);
+    final headCenter = center.translate(0, -8);
+    canvas.drawOval(Rect.fromCenter(center: headCenter, width: size.width * 0.65, height: size.height * 0.45), orange);
+    final muzzle = Path()
+      ..moveTo(center.dx - 12, center.dy + 4)
+      ..lineTo(center.dx, center.dy + 14)
+      ..lineTo(center.dx + 12, center.dy + 4)
+      ..close();
+    canvas.drawPath(muzzle, white);
+    canvas.drawCircle(headCenter.translate(-10, -2), 4, Paint()..color = Colors.white);
+    canvas.drawCircle(headCenter.translate(10, -2), 4, Paint()..color = Colors.white);
+    canvas.drawCircle(headCenter.translate(-10, -2), 2, Paint()..color = Colors.black54);
+    canvas.drawCircle(headCenter.translate(10, -2), 2, Paint()..color = Colors.black54);
+    canvas.drawCircle(center.translate(0, 6), 2, Paint()..color = const Color(0xFF773E28));
+  }
+
+  void _drawOwl(Canvas canvas, Size size) {
+    final body = Paint()..color = const Color(0xFF9AB3D0);
+    final wing = Paint()..color = const Color(0xFF7992B7);
+    final center = size.center(Offset.zero);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center, width: size.width * 0.7, height: size.height * 0.8),
+        const Radius.circular(18),
+      ),
+      body,
+    );
+    canvas.drawOval(Rect.fromCenter(center: center.translate(-6, 4), width: 26, height: 34), wing);
+    canvas.drawOval(Rect.fromCenter(center: center.translate(6, 4), width: 26, height: 34), wing);
+    canvas.drawCircle(center.translate(-8, -8), 6, Paint()..color = Colors.white);
+    canvas.drawCircle(center.translate(8, -8), 6, Paint()..color = Colors.white);
+    canvas.drawCircle(center.translate(-8, -8), 3, Paint()..color = Colors.black54);
+    canvas.drawCircle(center.translate(8, -8), 3, Paint()..color = Colors.black54);
+    final beak = Path()
+      ..moveTo(center.dx, center.dy - 2)
+      ..lineTo(center.dx - 4, center.dy + 4)
+      ..lineTo(center.dx + 4, center.dy + 4)
+      ..close();
+    canvas.drawPath(beak, Paint()..color = const Color(0xFFF6D36D));
+  }
+
+  void _drawPinkFish(Canvas canvas, Size size) {
+    final body = Paint()..color = const Color(0xFFFFB4D3);
+    final fin = Paint()..color = const Color(0xFFFF8EC3);
+    final center = size.center(Offset.zero);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center,
+        width: size.width * 0.9,
+        height: size.height * 0.45,
+      ),
+      body,
+    );
+    final tailPath = Path()
+      ..moveTo(center.dx + size.width * 0.45, center.dy)
+      ..quadraticBezierTo(
+          center.dx + size.width * 0.62, center.dy - size.height * 0.2, center.dx + size.width * 0.7, center.dy)
+      ..quadraticBezierTo(
+          center.dx + size.width * 0.62, center.dy + size.height * 0.2, center.dx + size.width * 0.45, center.dy)
+      ..close();
+    canvas.drawPath(tailPath, fin);
+    canvas.drawCircle(center.translate(-size.width * 0.25, -4), 4, Paint()..color = Colors.white);
+    canvas.drawCircle(center.translate(-size.width * 0.25, -4), 2, Paint()..color = Colors.black54);
+    canvas.drawCircle(
+      center.translate(-size.width * 0.15, 4),
+      2,
+      Paint()..color = Colors.white.withOpacity(0.6),
+    );
+  }
+
+  void _drawButterfly(Canvas canvas, Size size) {
+    final bodyPaint = Paint()..color = const Color(0xFF5B5B8F);
+    final leftWing = Paint()..color = const Color(0xFFB9E0FF);
+    final rightWing = Paint()..color = const Color(0xFF8CCCF9);
+    final center = size.center(Offset.zero);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center, width: 8, height: size.height * 0.7),
+        const Radius.circular(4),
+      ),
+      bodyPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: center.translate(-12, 0), width: size.width * 0.6, height: size.height * 0.4),
+      leftWing,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: center.translate(12, 0), width: size.width * 0.6, height: size.height * 0.4),
+      rightWing,
+    );
+  }
+
+  void _drawSmallSnake(Canvas canvas, Size size) {
+    final body = Paint()..color = const Color(0xFF79D08A);
+    final belly = Paint()..color = const Color(0xFFA7E5B6);
+    final center = size.center(Offset.zero);
+    final path = Path()
+      ..moveTo(center.dx - size.width * 0.4, center.dy + size.height * 0.1)
+      ..quadraticBezierTo(center.dx - 10, center.dy - 20, center.dx + 15, center.dy + 10)
+      ..quadraticBezierTo(center.dx + 35, center.dy + 35, center.dx + size.width * 0.35, center.dy - 5);
+    final stroke = Paint()
+      ..color = body.color
+      ..strokeWidth = 12
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, stroke);
+    final stripe = Paint()
+      ..color = belly.color
+      ..strokeWidth = 6
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, stripe);
+    final headCenter = Offset(center.dx + size.width * 0.35, center.dy - 10);
+    canvas.drawCircle(headCenter, 9, body);
+    canvas.drawCircle(headCenter.translate(-3, -1), 2, Paint()..color = Colors.white);
+    canvas.drawCircle(headCenter.translate(3, -1), 2, Paint()..color = Colors.white);
+    canvas.drawLine(
+      headCenter.translate(6, 2),
+      headCenter.translate(12, 6),
+      Paint()
+        ..color = Colors.pinkAccent
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+
+  void _drawBeak(Canvas canvas, Offset start, Offset end) {
+    final paint = Paint()
+      ..color = Colors.black45
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(start, end, paint);
+  }
+
+  void _drawPolygon(Canvas canvas, List<Offset> points, Paint paint) {
+    final path = Path()
+      ..moveTo(points.first.dx, points.first.dy);
+    for (var i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnimalSpritePainter oldDelegate) =>
+      oldDelegate.type != type;
+}
+
+class _FriendPaletteEntry {
+  _FriendPaletteEntry({
+    this.animalSpec,
+    this.personSpec,
+  }) : assert((animalSpec == null) != (personSpec == null)),
+        id = animalSpec != null
+            ? 'animal_${animalSpec!.type.name}'
+            : 'person_${personSpec!.type.name}';
+
+  final _AnimalSpec? animalSpec;
+  final _PersonSpec? personSpec;
+  final String id;
+
+  bool get isPerson => personSpec != null;
+  String get label => animalSpec?.displayName ?? personSpec!.displayName;
+}
+
+class _PersonSpec {
+  const _PersonSpec(this.displayName, this.type);
+
+  final String displayName;
+  final _PersonType type;
+}
+
+enum _PersonType { childExplorer, dreamer, caretaker }
+
+class _FriendPalette extends StatelessWidget {
+  const _FriendPalette({
+    required this.options,
+    required this.selected,
+    required this.onOptionSelected,
+  });
+
+  final List<_FriendPaletteEntry> options;
+  final _FriendPaletteEntry? selected;
+  final ValueChanged<_FriendPaletteEntry?> onOptionSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF4F6FC),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Amigos del jardín (50 puntos)',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4A6FA5),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: options.map((entry) {
+              final isSelected = selected?.id == entry.id;
+              return ChoiceChip(
+                label: Text(entry.label),
+                avatar: Icon(
+                  entry.isPerson ? Icons.emoji_people : Icons.pets,
+                  size: 18,
+                ),
+                selected: isSelected,
+                onSelected: (_) {
+                  if (isSelected) {
+                    onOptionSelected(null);
+                  } else {
+                    onOptionSelected(entry);
+                  }
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Elige un amigo. Para quitarlo o limpiar usa las herramientas superiores. Las flores cuentan como medio árbol para desbloquear este espacio.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF6E7C91)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendPersonWidget extends StatelessWidget {
+  const _FriendPersonWidget({required this.spec, required this.bob});
+
+  final _PersonSpec spec;
+  final double bob;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: Offset(0, bob),
+      child: SizedBox(
+        width: 56,
+        height: 70,
+        child: CustomPaint(
+          painter: _PersonSpritePainter(spec.type),
+        ),
+      ),
+    );
+  }
+}
+
+class _PersonSpritePainter extends CustomPainter {
+  _PersonSpritePainter(this.type);
+
+  final _PersonType type;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    switch (type) {
+      case _PersonType.childExplorer:
+        _paintExplorer(canvas, size);
+        break;
+      case _PersonType.dreamer:
+        _paintDreamer(canvas, size);
+        break;
+      case _PersonType.caretaker:
+        _paintCaretaker(canvas, size);
+        break;
+    }
+  }
+
+  void _paintExplorer(Canvas canvas, Size size) {
+    final body = Paint()..color = const Color(0xFF88C0A7);
+    final head = Paint()..color = const Color(0xFFFFE2C7);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.3, size.height * 0.35, size.width * 0.4, size.height * 0.5),
+        const Radius.circular(12),
+      ),
+      body,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.5, size.height * 0.25),
+      size.width * 0.18,
+      head,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(size.width * 0.25, size.height * 0.5, size.width * 0.5, 6),
+      Paint()..color = const Color(0xFF4F6B8A),
+    );
+    _drawSimpleFace(
+      canvas,
+      center: Offset(size.width * 0.5, size.height * 0.25),
+      eyeSpacing: 10,
+      eyeColor: const Color(0xFF4D3A30),
+      smileWidth: 12,
+    );
+  }
+
+  void _paintDreamer(Canvas canvas, Size size) {
+    final dress = Paint()..color = const Color(0xFFB8A5E5);
+    final head = Paint()..color = const Color(0xFFFFE8D8);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(size.width * 0.5, size.height * 0.6), width: size.width * 0.6, height: size.height * 0.6),
+      dress,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.5, size.height * 0.25),
+      size.width * 0.2,
+      head,
+    );
+    _drawSimpleFace(
+      canvas,
+      center: Offset(size.width * 0.5, size.height * 0.25),
+      eyeSpacing: 11,
+      eyeColor: const Color(0xFF463B4F),
+      smileWidth: 14,
+    );
+  }
+
+  void _paintCaretaker(Canvas canvas, Size size) {
+    final robe = Paint()..color = const Color(0xFFE7C08A);
+    final head = Paint()..color = const Color(0xFFFFE5C2);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(size.width * 0.5, size.height * 0.55), width: size.width * 0.5, height: size.height * 0.65),
+        const Radius.circular(18),
+      ),
+      robe,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.5, size.height * 0.25),
+      size.width * 0.18,
+      head,
+    );
+    _drawSimpleFace(
+      canvas,
+      center: Offset(size.width * 0.5, size.height * 0.25),
+      eyeSpacing: 10,
+      eyeColor: const Color(0xFF5B402E),
+      smileWidth: 10,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PersonSpritePainter oldDelegate) => oldDelegate.type != type;
+
+  void _drawSimpleFace(
+    Canvas canvas, {
+    required Offset center,
+    required double eyeSpacing,
+    required Color eyeColor,
+    required double smileWidth,
+  }) {
+    canvas.drawCircle(
+      center.translate(-eyeSpacing / 2, -6),
+      2,
+      Paint()..color = eyeColor,
+    );
+    canvas.drawCircle(
+      center.translate(eyeSpacing / 2, -6),
+      2,
+      Paint()..color = eyeColor,
+    );
+    final smile = Path()
+      ..moveTo(center.dx - smileWidth / 2, center.dy + 4)
+      ..quadraticBezierTo(center.dx, center.dy + 8, center.dx + smileWidth / 2, center.dy + 4);
+    canvas.drawPath(
+      smile,
+      Paint()
+        ..color = eyeColor.withOpacity(0.9)
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+}
+
+class _NpcMoodOption {
+  _NpcMoodOption({
+    required this.label,
+    required this.builder,
+    this.isActive = false,
+  });
+
+  final String label;
+  final String Function(int trees) builder;
+  bool isActive;
+
+  String messageForTrees(int trees) => builder(trees);
 }
 
 enum _VegetationMode { tree, flower }

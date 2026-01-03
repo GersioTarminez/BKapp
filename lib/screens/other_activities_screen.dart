@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'avatar_screen.dart';
-import 'emotions_screen.dart';
 import 'session_info_screen.dart';
 import 'settings_screen.dart';
 
@@ -11,12 +10,6 @@ class OtherActivitiesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _OtherItem(
-        icon: Icons.emoji_emotions_outlined,
-        title: 'Emociones',
-        subtitle: 'Registra cómo te sientes',
-        builder: () => const EmotionsScreen(),
-      ),
       _OtherItem(
         icon: Icons.person_pin,
         title: 'Crear mi Avatar',

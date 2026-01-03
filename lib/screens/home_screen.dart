@@ -100,15 +100,33 @@ class _HomeScreenState extends State<HomeScreen> {
                     TextField(
                       controller: _nameController,
                       textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F3554),
+                      ),
                       decoration: InputDecoration(
-                        labelText: 'Tu nombre',
-                        hintText: 'Escribe cómo quieres identificarte',
-                        labelStyle: const TextStyle(color: Color(0xFF4E6C93)),
+                        hintText: 'Escribe tu nombre',
+                        hintStyle: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF8AA4C3),
+                        ),
                         filled: true,
                         fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 12,
+                        ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(18),
                           borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF8FB3FF),
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),

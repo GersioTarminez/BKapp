@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/avatar_profile.dart';
 import '../models/emotion_entry.dart';
 import '../services/avatar_storage_service.dart';
+import '../services/session_log_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/avatar_preview.dart';
 
@@ -16,6 +17,7 @@ class EmotionsScreen extends StatefulWidget {
 class _EmotionsScreenState extends State<EmotionsScreen> {
   final StorageService _storageService = StorageService();
   final AvatarStorageService _avatarStorage = AvatarStorageService();
+  final SessionLogService _sessionLog = SessionLogService.instance;
   final TextEditingController _noteController = TextEditingController();
   List<EmotionEntry> _entries = [];
   AvatarProfile? _avatarProfile;
@@ -73,20 +75,37 @@ class _EmotionsScreenState extends State<EmotionsScreen> {
           : _noteController.text.trim(),
     );
 
-    await _storageService.addEntry(entry);
+    try {
+      await _storageService.addEntry(entry);
+      await _sessionLog.logEmotionEntry(
+        emotion: entry.emotion,
+        note: entry.note,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _isSaving = false;
-      _noteController.clear();
-      _selectedEmotion = null;
-      _entries = [..._entries, entry];
-    });
+      setState(() {
+        _noteController.clear();
+        _selectedEmotion = null;
+        _entries = [..._entries, entry];
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Emoción guardada')),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Emoción guardada')),
+      );
+    } catch (error, stack) {
+      debugPrint('Emotion save failed: $error');
+      debugPrint('$stack');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo guardar la emoción.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   Future<void> _deleteEntry(EmotionEntry entry) async {

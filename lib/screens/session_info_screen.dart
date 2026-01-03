@@ -21,10 +21,12 @@ class _SessionInfoScreenState extends State<SessionInfoScreen> {
     final service = SessionLogService.instance;
     final bubbles = await service.loadSessions(game: SessionGame.bubbleCalm);
     final garden = await service.loadSessions(game: SessionGame.seedGarden);
+    final emotions = await service.loadSessions(game: SessionGame.emotions);
     final starPaths = await DrawingStorageService.instance.loadStarPathRecords();
     return _SessionData(
       bubbles: bubbles,
       garden: garden,
+      emotions: emotions,
       starPaths: starPaths,
     );
   }
@@ -53,8 +55,9 @@ class _SessionInfoScreenState extends State<SessionInfoScreen> {
           final data = snapshot.data ?? const _SessionData();
           final bubbles = data.bubbles;
           final garden = data.garden;
+          final emotions = data.emotions;
           final starPaths = data.starPaths;
-          if (bubbles.isEmpty && garden.isEmpty && starPaths.isEmpty) {
+          if (bubbles.isEmpty && garden.isEmpty && emotions.isEmpty && starPaths.isEmpty) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
@@ -115,6 +118,14 @@ class _SessionInfoScreenState extends State<SessionInfoScreen> {
                       ...garden
                           .reversed
                           .map((session) => _GardenSessionCard(session: session)),
+                      const SizedBox(height: 24),
+                    ],
+                    if (emotions.isNotEmpty) ...[
+                      const _SectionHeader('Diario de Emociones'),
+                      const SizedBox(height: 12),
+                      ...emotions
+                          .reversed
+                          .map((session) => _EmotionSessionCard(session: session)),
                       const SizedBox(height: 24),
                     ],
                     if (starPaths.isNotEmpty) ...[
@@ -362,6 +373,65 @@ class _GardenSessionCard extends StatelessWidget {
   }
 }
 
+class _EmotionSessionCard extends StatelessWidget {
+  const _EmotionSessionCard({required this.session});
+
+  final SessionRecord session;
+
+  @override
+  Widget build(BuildContext context) {
+    final emotion = session.metrics['emotion'] ?? '-';
+    final note = session.metrics['note'] as String?;
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sesión ${session.startedAt.toLocal()}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4A6FA5),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Emoción: $emotion',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF35527D),
+              ),
+            ),
+            if (note != null && note.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Nota: $note',
+                style: const TextStyle(
+                  color: Color(0xFF5F7D95),
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
+            Text(
+              'Usuario: ${session.userName}',
+              style: const TextStyle(
+                color: Color(0xFF6B7C9C),
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StarPathRecordCard extends StatelessWidget {
   const _StarPathRecordCard({required this.record});
 
@@ -512,10 +582,12 @@ class _SessionData {
   const _SessionData({
     this.bubbles = const [],
     this.garden = const [],
+    this.emotions = const [],
     this.starPaths = const [],
   });
 
   final List<SessionRecord> bubbles;
   final List<SessionRecord> garden;
+  final List<SessionRecord> emotions;
   final List<StarPathRecord> starPaths;
 }
