@@ -32,14 +32,17 @@ class OtherActivitiesScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Otras experiencias'),
+        title: const Text('Ajustes'),
         backgroundColor: const Color(0xFF8FB3FF),
         foregroundColor: Colors.white,
       ),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemBuilder: (context, index) {
-          final item = items[index];
+          if (index == 0) {
+            return const _OtherIntro();
+          }
+          final item = items[index - 1];
           return Card(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
@@ -77,7 +80,7 @@ class OtherActivitiesScreen extends StatelessWidget {
           );
         },
         separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemCount: items.length,
+        itemCount: items.length + 1,
       ),
     );
   }
@@ -95,4 +98,41 @@ class _OtherItem {
   final String title;
   final String subtitle;
   final Widget Function() builder;
+}
+
+class _OtherIntro extends StatelessWidget {
+  const _OtherIntro();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6FC),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            'Personaliza tu experiencia',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF35527D),
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Aquí puedes crear tu avatar, revisar ajustes calmados y consultar los reportes de sesión. '
+            'Todo está pensado para que configures la app a tu ritmo.',
+            style: TextStyle(
+              color: Color(0xFF5F7D95),
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

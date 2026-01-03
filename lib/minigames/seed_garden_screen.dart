@@ -109,7 +109,6 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
   final List<_PersonSpec> _personOptions = const [
     _PersonSpec('Peque aventurero', _PersonType.childExplorer),
     _PersonSpec('Amiga soñadora', _PersonType.dreamer),
-    _PersonSpec('Cuidadora serena', _PersonType.caretaker),
   ];
 
   List<_AnimalSpec> get _manualAnimalOptions {
@@ -539,6 +538,41 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
     _scheduleSave();
   }
 
+  void _openFriendPalette() {
+    if (!_creativeUnlocked || !mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: _FriendPaletteSheet(
+            options: _friendPaletteOptions,
+            selected: _selectedFriendEntry,
+            onOptionSelected: (entry) {
+              Navigator.pop(context);
+              setState(() {
+                _selectedFriendEntry = entry;
+                _isEraserMode = false;
+              });
+            },
+            onClearSelection: () {
+              Navigator.pop(context);
+              setState(() {
+                _selectedFriendEntry = null;
+              });
+            },
+          ),
+        );
+      },
+    );
+  }
+
   void _refreshCalmMessage() {
     if (_trees.isEmpty) {
       _calmMessage = 'Toca en cualquier lugar para hacer crecer tu bosque tranquilo.';
@@ -956,23 +990,30 @@ class _SeedGardenScreenState extends State<SeedGardenScreen>
                     ),
                   ),
                 ),
-                if (_creativeUnlocked)
-                  _FriendPalette(
-                    options: _friendPaletteOptions,
-                    selected: _selectedFriendEntry,
-                    onOptionSelected: (entry) {
-                      setState(() {
-                        _selectedFriendEntry = entry;
-                        _isEraserMode = false;
-                      });
-                    },
+                Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFDFCF5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 6,
+                        offset: Offset(0, -2),
+                      ),
+                    ],
                   ),
-                _CalmPanel(
-                  message: _calmMessage,
-                  companionLine: _npcLine,
-                  moods: _npcMoods,
-                  onMoodSelected: _handleMoodTap,
-                  medalValue: _highestMilestone,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                  child: _CalmPanel(
+                    message: _calmMessage,
+                    companionLine: _npcLine,
+                    moods: _npcMoods,
+                    onMoodSelected: _handleMoodTap,
+                    medalValue: _highestMilestone,
+                    canManageFriends: _creativeUnlocked,
+                    onManageFriends:
+                        _creativeUnlocked ? _openFriendPalette : null,
+                  ),
                 ),
               ],
             ),
@@ -1179,11 +1220,6 @@ class _GardenToolsBar extends StatelessWidget {
             icon: const Icon(Icons.cleaning_services_outlined, size: 18),
             label: const Text('Limpiar todo'),
           ),
-          const Spacer(),
-          const Text(
-            'Disponible desde el inicio',
-            style: TextStyle(fontSize: 12, color: Color(0xFF6A788F)),
-          ),
         ],
       ),
     );
@@ -1197,6 +1233,8 @@ class _CalmPanel extends StatelessWidget {
     required this.moods,
     required this.onMoodSelected,
     required this.medalValue,
+    this.canManageFriends = false,
+    this.onManageFriends,
   });
 
   final String message;
@@ -1204,79 +1242,78 @@ class _CalmPanel extends StatelessWidget {
   final List<_NpcMoodOption> moods;
   final void Function(_NpcMoodOption) onMoodSelected;
   final int medalValue;
+  final bool canManageFriends;
+  final VoidCallback? onManageFriends;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFDFCF5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _GardenerAvatar(),
-                  Positioned(
-                    right: -4,
-                    bottom: -4,
-                    child: _MedalBadge(value: medalValue),
+                  Text(
+                    companionLine,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4A6FA5),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF5F7D95),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      companionLine,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF4A6FA5),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      message,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF5F7D95),
-                      ),
-                    ),
-                  ],
+            ),
+            const SizedBox(width: 12),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const _GardenerAvatar(),
+                Positioned(
+                  right: -4,
+                  bottom: -4,
+                  child: _MedalBadge(value: medalValue),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            children: moods.map((mood) {
-              return ChoiceChip(
-                label: Text(mood.label),
-                selected: mood.isActive,
-                onSelected: (_) => onMoodSelected(mood),
-              );
-            }).toList(),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 10,
+          children: moods.map((mood) {
+            return ChoiceChip(
+              label: Text(mood.label),
+              selected: mood.isActive,
+              onSelected: (_) => onMoodSelected(mood),
+            );
+          }).toList(),
+        ),
+        if (canManageFriends) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: onManageFriends,
+              icon: const Icon(Icons.collections_bookmark_outlined),
+              label: const Text('Amigos del jardín'),
+            ),
           ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -1787,10 +1824,83 @@ class _PersonSpec {
   final _PersonType type;
 }
 
-enum _PersonType { childExplorer, dreamer, caretaker }
+enum _PersonType { childExplorer, dreamer }
 
-class _FriendPalette extends StatelessWidget {
-  const _FriendPalette({
+class _FriendPaletteSheet extends StatelessWidget {
+  const _FriendPaletteSheet({
+    required this.options,
+    required this.selected,
+    required this.onOptionSelected,
+    required this.onClearSelection,
+  });
+
+  final List<_FriendPaletteEntry> options;
+  final _FriendPaletteEntry? selected;
+  final ValueChanged<_FriendPaletteEntry?> onOptionSelected;
+  final VoidCallback onClearSelection;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.pets, color: Color(0xFF4A6FA5)),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Amigos del jardín',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4A6FA5),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _FriendsGrid(
+              options: options,
+              selected: selected,
+              onOptionSelected: onOptionSelected,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: onClearSelection,
+                  icon: const Icon(Icons.remove_circle_outline),
+                  label: const Text('Sin selección'),
+                ),
+                const Spacer(),
+                const Text(
+                  'Toca un amigo y luego el jardín para colocarlo.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF5F7D95),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FriendsGrid extends StatelessWidget {
+  const _FriendsGrid({
     required this.options,
     required this.selected,
     required this.onOptionSelected,
@@ -1802,49 +1912,85 @@ class _FriendPalette extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFF4F6FC),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Amigos del jardín (50 puntos)',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF4A6FA5),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: options.map((entry) {
-              final isSelected = selected?.id == entry.id;
-              return ChoiceChip(
-                label: Text(entry.label),
-                avatar: Icon(
-                  entry.isPerson ? Icons.emoji_people : Icons.pets,
-                  size: 18,
+    final rows = <List<_FriendPaletteEntry>>[];
+    for (var i = 0; i < options.length; i += 3) {
+      rows.add(
+        options.sublist(i, i + 3 > options.length ? options.length : i + 3),
+      );
+    }
+
+    return Column(
+      children: rows.map((row) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: List.generate(3, (index) {
+              if (index >= row.length) {
+                return const Expanded(child: SizedBox());
+              }
+              final entry = row[index];
+              final isSelected = entry.id == selected?.id;
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: index < 2 ? 8 : 0),
+                  child: _FriendTile(
+                    entry: entry,
+                    selected: isSelected,
+                    onTap: () => onOptionSelected(isSelected ? null : entry),
+                  ),
                 ),
-                selected: isSelected,
-                onSelected: (_) {
-                  if (isSelected) {
-                    onOptionSelected(null);
-                  } else {
-                    onOptionSelected(entry);
-                  }
-                },
               );
-            }).toList(),
+            }),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Elige un amigo. Para quitarlo o limpiar usa las herramientas superiores. Las flores cuentan como medio árbol para desbloquear este espacio.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF6E7C91)),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _FriendTile extends StatelessWidget {
+  const _FriendTile({
+    required this.entry,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _FriendPaletteEntry entry;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? const Color(0xFF8FB3FF) : const Color(0xFFF0F4FF),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                entry.isPerson ? Icons.emoji_people : Icons.pets,
+                color: selected ? Colors.white : const Color(0xFF5F6F8F),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                entry.label,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white : const Color(0xFF4A5A7B),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1884,9 +2030,6 @@ class _PersonSpritePainter extends CustomPainter {
         break;
       case _PersonType.dreamer:
         _paintDreamer(canvas, size);
-        break;
-      case _PersonType.caretaker:
-        _paintCaretaker(canvas, size);
         break;
     }
   }
@@ -1937,30 +2080,6 @@ class _PersonSpritePainter extends CustomPainter {
       eyeSpacing: 11,
       eyeColor: const Color(0xFF463B4F),
       smileWidth: 14,
-    );
-  }
-
-  void _paintCaretaker(Canvas canvas, Size size) {
-    final robe = Paint()..color = const Color(0xFFE7C08A);
-    final head = Paint()..color = const Color(0xFFFFE5C2);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(size.width * 0.5, size.height * 0.55), width: size.width * 0.5, height: size.height * 0.65),
-        const Radius.circular(18),
-      ),
-      robe,
-    );
-    canvas.drawCircle(
-      Offset(size.width * 0.5, size.height * 0.25),
-      size.width * 0.18,
-      head,
-    );
-    _drawSimpleFace(
-      canvas,
-      center: Offset(size.width * 0.5, size.height * 0.25),
-      eyeSpacing: 10,
-      eyeColor: const Color(0xFF5B402E),
-      smileWidth: 10,
     );
   }
 

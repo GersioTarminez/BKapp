@@ -36,7 +36,7 @@ class _AvatarPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final centerX = size.width / 2;
     final bodyTop = size.height * 0.55;
-    final faceColor = const Color(0xFFFFF3E0);
+    final faceColor = profile.skinColorValue;
 
     _drawBody(canvas, size, bodyTop);
     _drawNeck(canvas, size, faceColor);

@@ -38,6 +38,11 @@ class _AvatarScreenState extends State<AvatarScreen> {
     const Color(0xFF5D5F71),
     const Color(0xFFF0C987),
   ];
+  final List<Color> _skinColors = [
+    const Color(0xFFFFE0CC),
+    const Color(0xFFE2B6A3),
+    const Color(0xFFCC8F6D),
+  ];
 
   final List<Color> _clothingColors = [
     const Color(0xFFA4E4AF),
@@ -169,6 +174,18 @@ class _AvatarScreenState extends State<AvatarScreen> {
                       onSelect: (color) => _updateProfile(
                         _profile.copyWith(
                           hairColor: AvatarProfile.colorToHex(color),
+                        ),
+                      ),
+                    ),
+                  ),
+                  _buildSection(
+                    title: 'Color de piel',
+                    child: _buildColorWrap(
+                      options: _skinColors,
+                      selectedHex: _profile.skinColor,
+                      onSelect: (color) => _updateProfile(
+                        _profile.copyWith(
+                          skinColor: AvatarProfile.colorToHex(color),
                         ),
                       ),
                     ),

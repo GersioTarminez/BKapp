@@ -107,7 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
           Center(
             child: Text(
-              'Versión 0.1.0 – Alpha\nSergio Martínez París · TFG',
+              'Versión 1.1.2\nSergio Martínez París · TFG',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFF5F7D95),

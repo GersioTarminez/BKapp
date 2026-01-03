@@ -240,14 +240,14 @@ class _OthersButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: Row(
           children: const [
-            Icon(Icons.apps, color: Colors.white, size: 36),
+            Icon(Icons.settings, color: Colors.white, size: 36),
             SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Otras experiencias',
+                    'Ajustes',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -256,7 +256,7 @@ class _OthersButton extends StatelessWidget {
                   ),
                   SizedBox(height: 6),
                   Text(
-                    'Emociones, avatar, ajustes y más',
+                    'Avatar, preferencias y reportes',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.white70,

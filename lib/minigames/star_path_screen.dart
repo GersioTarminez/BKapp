@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 
 import '../services/drawing_storage_service.dart';
 import '../services/preferences_service.dart';
+import '../services/sound_service.dart';
 
 class StarPathScreen extends StatefulWidget {
   const StarPathScreen({super.key});
@@ -44,16 +45,17 @@ class _StarPathScreenState extends State<StarPathScreen>
   bool _savePressed = false;
   int _starsPlaced = 0;
   double _pathLength = 0;
+  bool _starSoundActive = false;
 
   late final AnimationController _pulseController;
 
   static const List<Color> _palette = [
-    Color(0xFFFFC6B5),
-    Color(0xFFFFE29F),
-    Color(0xFFE5FFB8),
-    Color(0xFFA6F7D3),
-    Color(0xFFB5DBFF),
-    Color(0xFFD9C4FF),
+    Color(0xFFE96E5A),
+    Color(0xFFE6A540),
+    Color(0xFFC1E048),
+    Color(0xFF4FD6A2),
+    Color(0xFF55A8FF),
+    Color(0xFF9A79FF),
   ];
 
   static const List<String> _wordPool = [
@@ -87,6 +89,7 @@ class _StarPathScreenState extends State<StarPathScreen>
     _repaintSignal.dispose();
     _starCountNotifier.dispose();
     _glowTimer?.cancel();
+    _stopStarSound();
     if (_sessionWatch.isRunning) {
       _sessionWatch.stop();
     }
@@ -100,6 +103,7 @@ class _StarPathScreenState extends State<StarPathScreen>
           ? _wordPool[_random.nextInt(_wordPool.length)]
           : null;
       _resetSession();
+      _ensureStarSound();
     });
   }
 
@@ -195,6 +199,18 @@ class _StarPathScreenState extends State<StarPathScreen>
       });
     }
     _repaintSignal.value++;
+  }
+
+  void _ensureStarSound() {
+    if (_starSoundActive) return;
+    SoundService.instance.startStarTrail();
+    _starSoundActive = true;
+  }
+
+  void _stopStarSound() {
+    if (!_starSoundActive) return;
+    SoundService.instance.stopStarTrail();
+    _starSoundActive = false;
   }
 
   void _clearConstellation() {
@@ -529,7 +545,7 @@ class _StarPathScreenState extends State<StarPathScreen>
         children: [
           const Text(
             'Figuras',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(color: Colors.white),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -540,11 +556,21 @@ class _StarPathScreenState extends State<StarPathScreen>
                 return ChoiceChip(
                   label: Icon(
                     _iconForBrush(brush),
-                    color: selected ? Colors.white : Colors.white70,
+                    color: selected
+                        ? const Color(0xFFFFE29F)
+                        : const Color(0xFFBAC4E5),
                   ),
                   selected: selected,
-                  selectedColor: Colors.white.withOpacity(0.2),
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  selectedColor: const Color(0xFF243454),
+                  backgroundColor: const Color(0xFF111A30),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(
+                      color: selected
+                          ? Colors.white
+                          : const Color(0xFF2E3B5C),
+                    ),
+                  ),
                   onSelected: (_) {
                     setState(() {
                       _currentBrush = brush;

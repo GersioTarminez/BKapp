@@ -4,6 +4,7 @@ class AvatarProfile {
   AvatarProfile({
     required this.hairType,
     required this.hairColor,
+    required this.skinColor,
     required this.faceType,
     required this.expression,
     required this.shirtType,
@@ -15,6 +16,7 @@ class AvatarProfile {
 
   final String hairType;
   final String hairColor;
+  final String skinColor;
   final String faceType;
   final String expression;
   final String shirtType;
@@ -26,6 +28,7 @@ class AvatarProfile {
   static AvatarProfile defaults() => AvatarProfile(
         hairType: 'short',
         hairColor: '#FFD1DC',
+        skinColor: '#FFE0CC',
         faceType: 'round',
         expression: 'smile',
         shirtType: 'basic',
@@ -38,6 +41,7 @@ class AvatarProfile {
   AvatarProfile copyWith({
     String? hairType,
     String? hairColor,
+    String? skinColor,
     String? faceType,
     String? expression,
     String? shirtType,
@@ -49,6 +53,7 @@ class AvatarProfile {
     return AvatarProfile(
       hairType: hairType ?? this.hairType,
       hairColor: hairColor ?? this.hairColor,
+      skinColor: skinColor ?? this.skinColor,
       faceType: faceType ?? this.faceType,
       expression: expression ?? this.expression,
       shirtType: shirtType ?? this.shirtType,
@@ -63,6 +68,7 @@ class AvatarProfile {
     return {
       'hairType': hairType,
       'hairColor': hairColor,
+      'skinColor': skinColor,
       'faceType': faceType,
       'expression': expression,
       'shirtType': shirtType,
@@ -77,6 +83,7 @@ class AvatarProfile {
     return AvatarProfile(
       hairType: json['hairType'] as String? ?? 'short',
       hairColor: json['hairColor'] as String? ?? '#FFD1DC',
+      skinColor: json['skinColor'] as String? ?? '#FFE0CC',
       faceType: json['faceType'] as String? ?? 'round',
       expression: json['expression'] as String? ?? 'smile',
       shirtType: json['shirtType'] as String? ?? 'basic',
@@ -88,6 +95,7 @@ class AvatarProfile {
   }
 
   Color get hairColorValue => colorFromHex(hairColor);
+  Color get skinColorValue => colorFromHex(skinColor);
   Color get shirtColorValue => colorFromHex(shirtColor);
   Color get shoesColorValue => colorFromHex(shoesColor);
 
